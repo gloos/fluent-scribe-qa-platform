@@ -1,0 +1,43 @@
+# Task ID: 9
+# Title: Implement Basic MQM Scoring
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Develop a basic MQM scoring system following industry standards.
+# Details:
+
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Define MQM Error Taxonomy [pending]
+### Dependencies: None
+### Description: Develop a comprehensive taxonomy of error types and subtypes based on MQM standards, ensuring each error type is clearly described and mapped to project requirements.
+### Details:
+Reference MQM-Full and MQM-Core to select relevant error dimensions and subtypes. Document definitions and ensure alignment with industry terminology.
+
+## 2. Establish Severity Classification System [pending]
+### Dependencies: 9.1
+### Description: Create a standardized system for classifying the severity of each error type, including clear criteria for each severity level.
+### Details:
+Define severity levels (e.g., Minor, Major, Critical) and provide guidelines for evaluators to consistently assign severity to errors within the taxonomy.
+
+## 3. Design Scoring Algorithm [pending]
+### Dependencies: 9.1, 9.2
+### Description: Develop the algorithm that calculates quality scores based on error counts, severity, and normalization parameters.
+### Details:
+Implement linear and calibrated scoring models as per MQM 2.0, including normalization by evaluation word count, reference word count, and penalty scalars. Ensure the algorithm supports both raw and calibrated scoring outputs.
+
+## 4. Develop Weighting System [pending]
+### Dependencies: 9.1, 9.2, 9.3
+### Description: Define and implement a weighting system that assigns different weights to error types and severity levels according to project or stakeholder priorities.
+### Details:
+Allow for customization of weights for error types and severities. Document the rationale and provide configuration options for different evaluation scenarios.
+
+## 5. Specify Reporting Format [pending]
+### Dependencies: 9.1, 9.2, 9.3, 9.4
+### Description: Design the format for presenting MQM scores and error analyses, ensuring clarity and usability for stakeholders.
+### Details:
+Define templates for scorecards and reports, including breakdowns by error type, severity, and weighted scores. Ensure the format supports both detailed and summary views.
+

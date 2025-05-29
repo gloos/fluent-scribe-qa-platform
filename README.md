@@ -1,73 +1,190 @@
-# Welcome to your Lovable project
+# AI-Powered Linguistic QA Platform
 
-## Project info
+![Platform Preview](https://img.shields.io/badge/Status-In%20Development-yellow)
+![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20TypeScript%20%7C%20Vite-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-**URL**: https://lovable.dev/projects/01bd64c4-ff62-485c-a90a-d2d28007c16c
+## 🚀 Overview
 
-## How can I edit this code?
+The AI-Powered Linguistic QA Platform is a comprehensive web application designed to assess translation quality using advanced Large Language Models (LLMs). The platform enables users to upload XLIFF files, receive detailed quality assessment reports, and manage linguistic quality evaluation workflows with industry-standard MQM (Multidimensional Quality Metrics) scoring.
 
-There are several ways of editing your application.
+## ✨ Features
 
-**Use Lovable**
+### 📁 File Upload & Processing
+- Support for XLIFF 1.2, 2.0, and MXLIFF file formats
+- Drag-and-drop file upload interface
+- Real-time upload progress tracking
+- File validation and error handling
+- Batch file processing capabilities
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/01bd64c4-ff62-485c-a90a-d2d28007c16c) and start prompting.
+### 🤖 AI-Powered Quality Assessment
+- LLM-based linguistic analysis using advanced models
+- Automated error detection and categorization
+- MQM (Multidimensional Quality Metrics) scoring
+- Comprehensive quality reports with detailed feedback
+- Support for multiple language pairs
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📊 Dashboard & Analytics
+- Real-time processing status updates
+- Historical data visualization
+- Quality trend analysis
+- Export capabilities (PDF, CSV, Excel)
+- Customizable reporting dashboards
 
-**Use your preferred IDE**
+## 🛠️ Tech Stack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI Framework**: Tailwind CSS + shadcn/ui components  
+- **State Management**: TanStack Query (React Query)
+- **Routing**: React Router DOM
+- **Form Handling**: React Hook Form + Zod validation
+- **File Upload**: React Dropzone
+- **Charts**: Recharts
+- **Backend**: Supabase (Database + Authentication)
+- **Development**: ESLint + TypeScript ESLint
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🚀 Quick Start
 
-Follow these steps:
+### Prerequisites
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Node.js 18+ and npm/yarn/pnpm
+- Git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Installation
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/gloos/fluent-scribe-qa-platform.git
+   cd fluent-scribe-qa-platform
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   # or
+   pnpm install
+   ```
+
+3. **Environment Setup**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Start development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   # or
+   pnpm dev
+   ```
+
+5. **Open your browser**
+   ```
+   http://localhost:5173
+   ```
+
+## 📋 Development Workflow
+
+This project uses [TaskMaster AI](https://github.com/gloos/task-master-ai) for task management and development workflow automation.
+
+### Task Management Commands
+
+```bash
+# View current tasks
+task-master list
+
+# Get next task to work on
+task-master next
+
+# Update task status
+task-master set-status --id=<task-id> --status=<status>
+
+# Generate task files
+task-master generate
 ```
 
-**Edit a file directly in GitHub**
+### Git Workflow
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Create feature branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-**Use GitHub Codespaces**
+2. **Make changes and commit**
+   ```bash
+   git add .
+   git commit -m "feat: implement feature description"
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. **Push and create PR**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-## What technologies are used for this project?
+### Code Quality
 
-This project is built with:
+- **Linting**: `npm run lint`
+- **Type Checking**: Built into Vite development server
+- **Code Formatting**: Configured with ESLint
+- **Pre-commit Hooks**: Automated linting and type checking
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📁 Project Structure
 
-## How can I deploy this project?
+```
+fluent-scribe-qa-platform/
+├── src/                    # Source code
+│   ├── components/         # Reusable UI components
+│   ├── pages/             # Page components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utility functions
+│   ├── types/             # TypeScript type definitions
+│   └── App.tsx            # Main application component
+├── tasks/                 # TaskMaster AI task files
+├── scripts/               # Development scripts and docs
+├── public/                # Static assets
+└── docs/                  # Additional documentation
+```
 
-Simply open [Lovable](https://lovable.dev/projects/01bd64c4-ff62-485c-a90a-d2d28007c16c) and click on Share -> Publish.
+## 🔧 Available Scripts
 
-## Can I connect a custom domain to my Lovable project?
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run build:dev` - Build for development
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
 
-Yes, you can!
+## 🤝 Contributing
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. **Fork the repository**
+2. **Create your feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit your changes** (`git commit -m 'Add some amazing feature'`)
+4. **Push to the branch** (`git push origin feature/amazing-feature`)
+5. **Open a Pull Request**
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Development Guidelines
+
+- Follow the existing code style and conventions
+- Write clear, descriptive commit messages
+- Add appropriate tests for new features
+- Update documentation as needed
+- Use TaskMaster AI for task management and progress tracking
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 📞 Support
+
+For questions, issues, or contributions, please:
+
+1. Check existing [GitHub Issues](https://github.com/gloos/fluent-scribe-qa-platform/issues)
+2. Create a new issue with detailed information
+3. Join our community discussions
+
+---
+
+**Built with ❤️ using React, TypeScript, and AI-powered workflow automation**
