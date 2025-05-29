@@ -1,53 +1,9 @@
 import { supabase } from './supabase';
 import type { User } from '@supabase/supabase-js';
+import { UserRole, UserProfile, UserStatus, Permission } from './types/user';
 
-// Define system roles
-export enum UserRole {
-  SUPER_ADMIN = 'super_admin',
-  ADMIN = 'admin',
-  MANAGER = 'manager', 
-  QA_ANALYST = 'qa_analyst',
-  USER = 'user',
-  GUEST = 'guest'
-}
-
-// Define system permissions
-export enum Permission {
-  // User management
-  MANAGE_USERS = 'manage_users',
-  VIEW_USERS = 'view_users',
-  DELETE_USERS = 'delete_users',
-  
-  // Role management
-  MANAGE_ROLES = 'manage_roles',
-  ASSIGN_ROLES = 'assign_roles',
-  
-  // QA Sessions
-  CREATE_QA_SESSION = 'create_qa_session',
-  VIEW_QA_SESSION = 'view_qa_session',
-  VIEW_ALL_QA_SESSIONS = 'view_all_qa_sessions',
-  DELETE_QA_SESSION = 'delete_qa_session',
-  DELETE_ANY_QA_SESSION = 'delete_any_qa_session',
-  
-  // File management
-  UPLOAD_FILES = 'upload_files',
-  DELETE_FILES = 'delete_files',
-  DELETE_ANY_FILES = 'delete_any_files',
-  
-  // Reports and analytics
-  VIEW_REPORTS = 'view_reports',
-  VIEW_ALL_REPORTS = 'view_all_reports',
-  EXPORT_REPORTS = 'export_reports',
-  
-  // System administration
-  VIEW_SYSTEM_LOGS = 'view_system_logs',
-  MANAGE_SYSTEM_CONFIG = 'manage_system_config',
-  
-  // Billing and subscription
-  VIEW_BILLING = 'view_billing',
-  MANAGE_BILLING = 'manage_billing',
-  VIEW_ALL_BILLING = 'view_all_billing'
-}
+// Export the enums and types we need
+export { UserRole, UserStatus, Permission } from './types/user';
 
 // Role permission mapping
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -133,17 +89,6 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   [UserRole.GUEST]: 10
 };
 
-interface UserProfile {
-  id: string;
-  email: string;
-  role: UserRole;
-  full_name?: string;
-  phone?: string;
-  bio?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 class RBACService {
   private userProfileCache: Map<string, UserProfile> = new Map();
   private cacheExpiry: Map<string, number> = new Map();
@@ -161,10 +106,19 @@ class RBACService {
       return cached;
     }
 
-    // Fetch from database
+    // Fetch from database with all required fields
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, role, full_name, phone, bio, created_at, updated_at')
+      .select(`
+        id, email, full_name, first_name, last_name, display_name, avatar_url, phone, bio,
+        role, organization_id, department, job_title, manager_id,
+        status, is_verified, email_verified_at, last_login_at, last_activity_at, login_count,
+        password_changed_at, two_factor_enabled, backup_codes_generated_at, 
+        failed_login_attempts, locked_until,
+        timezone, locale, date_format, time_format,
+        user_agent, ip_address, signup_source, referral_code, marketing_consent,
+        created_at, updated_at, created_by, updated_by
+      `)
       .eq('id', userId)
       .single();
 
@@ -174,8 +128,58 @@ class RBACService {
     }
 
     const profile: UserProfile = {
-      ...data,
-      role: data.role as UserRole || UserRole.USER
+      id: data.id,
+      email: data.email,
+      full_name: data.full_name || undefined,
+      first_name: data.first_name || undefined,
+      last_name: data.last_name || undefined,
+      display_name: data.display_name || undefined,
+      avatar_url: data.avatar_url || undefined,
+      phone: data.phone || undefined,
+      bio: data.bio || undefined,
+      
+      // Role and permissions
+      role: (data.role as UserRole) || UserRole.USER,
+      
+      // Organization and team structure
+      organization_id: data.organization_id || undefined,
+      department: data.department || undefined,
+      job_title: data.job_title || undefined,
+      manager_id: data.manager_id || undefined,
+      
+      // User status and activity
+      status: (data.status as UserStatus) || UserStatus.ACTIVE,
+      is_verified: data.is_verified || false,
+      email_verified_at: data.email_verified_at || undefined,
+      last_login_at: data.last_login_at || undefined,
+      last_activity_at: data.last_activity_at || undefined,
+      login_count: data.login_count || 0,
+      
+      // Security fields
+      password_changed_at: data.password_changed_at || undefined,
+      two_factor_enabled: data.two_factor_enabled || false,
+      backup_codes_generated_at: data.backup_codes_generated_at || undefined,
+      failed_login_attempts: data.failed_login_attempts || 0,
+      locked_until: data.locked_until || undefined,
+      
+      // User preferences
+      timezone: data.timezone || 'UTC',
+      locale: data.locale || 'en-US',
+      date_format: data.date_format || 'yyyy-MM-dd',
+      time_format: data.time_format || '24h',
+      
+      // Metadata
+      user_agent: data.user_agent || undefined,
+      ip_address: data.ip_address || undefined,
+      signup_source: data.signup_source || undefined,
+      referral_code: data.referral_code || undefined,
+      marketing_consent: data.marketing_consent || false,
+      
+      // Audit fields
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      created_by: data.created_by || undefined,
+      updated_by: data.updated_by || undefined
     };
 
     // Cache the result
@@ -310,7 +314,16 @@ class RBACService {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, role, full_name, phone, bio, created_at, updated_at')
+        .select(`
+          id, email, full_name, first_name, last_name, display_name, avatar_url, phone, bio,
+          role, organization_id, department, job_title, manager_id,
+          status, is_verified, email_verified_at, last_login_at, last_activity_at, login_count,
+          password_changed_at, two_factor_enabled, backup_codes_generated_at, 
+          failed_login_attempts, locked_until,
+          timezone, locale, date_format, time_format,
+          user_agent, ip_address, signup_source, referral_code, marketing_consent,
+          created_at, updated_at, created_by, updated_by
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -319,8 +332,58 @@ class RBACService {
       }
 
       const users: UserProfile[] = data.map(user => ({
-        ...user,
-        role: user.role as UserRole || UserRole.USER
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || undefined,
+        first_name: user.first_name || undefined,
+        last_name: user.last_name || undefined,
+        display_name: user.display_name || undefined,
+        avatar_url: user.avatar_url || undefined,
+        phone: user.phone || undefined,
+        bio: user.bio || undefined,
+        
+        // Role and permissions
+        role: (user.role as UserRole) || UserRole.USER,
+        
+        // Organization and team structure
+        organization_id: user.organization_id || undefined,
+        department: user.department || undefined,
+        job_title: user.job_title || undefined,
+        manager_id: user.manager_id || undefined,
+        
+        // User status and activity
+        status: (user.status as UserStatus) || UserStatus.ACTIVE,
+        is_verified: user.is_verified || false,
+        email_verified_at: user.email_verified_at || undefined,
+        last_login_at: user.last_login_at || undefined,
+        last_activity_at: user.last_activity_at || undefined,
+        login_count: user.login_count || 0,
+        
+        // Security fields
+        password_changed_at: user.password_changed_at || undefined,
+        two_factor_enabled: user.two_factor_enabled || false,
+        backup_codes_generated_at: user.backup_codes_generated_at || undefined,
+        failed_login_attempts: user.failed_login_attempts || 0,
+        locked_until: user.locked_until || undefined,
+        
+        // User preferences
+        timezone: user.timezone || 'UTC',
+        locale: user.locale || 'en-US',
+        date_format: user.date_format || 'yyyy-MM-dd',
+        time_format: user.time_format || '24h',
+        
+        // Metadata
+        user_agent: user.user_agent || undefined,
+        ip_address: user.ip_address || undefined,
+        signup_source: user.signup_source || undefined,
+        referral_code: user.referral_code || undefined,
+        marketing_consent: user.marketing_consent || false,
+        
+        // Audit fields
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+        created_by: user.created_by || undefined,
+        updated_by: user.updated_by || undefined
       }));
 
       return { success: true, users };

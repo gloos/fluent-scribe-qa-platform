@@ -1,11 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Import comprehensive user types
+export * from './types/user'
+import type { Database } from './types/user'
+
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://uqprvrrncpqhpfxafeuc.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your_anon_key_here'
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
 // Create Supabase client with enhanced security settings
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     // Enable automatic token refresh
     autoRefreshToken: true,
@@ -71,39 +79,48 @@ export const SESSION_CONFIG = {
   MAX_SESSION_DURATION: 24 * 60 * 60
 } as const;
 
-// Types for our database tables
-export interface User {
-  id: string
-  email: string
-  created_at: string
-  updated_at: string
+// Auth state change handler
+export const onAuthStateChange = (callback: (session: any) => void) => {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(session)
+  })
 }
 
-export interface QASession {
-  id: string
-  user_id: string
-  file_name: string
-  file_type: string
-  file_size: number
-  upload_timestamp: string
-  analysis_status: 'pending' | 'processing' | 'completed' | 'failed'
-  mqm_score?: number
-  error_count?: number
-  warning_count?: number
-  created_at: string
-  updated_at: string
+// File upload helper
+export const uploadFile = async (bucket: string, path: string, file: File) => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
+
+  return { data, error }
 }
 
-export interface QAError {
-  id: string
-  session_id: string
-  segment_id: string
-  error_type: string
-  error_category: string
-  severity: 'minor' | 'major' | 'critical'
-  source_text: string
-  target_text: string
-  error_description: string
-  suggestion?: string
-  created_at: string
+// Get public URL for uploaded file
+export const getPublicUrl = (bucket: string, path: string) => {
+  const { data } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(path)
+
+  return data.publicUrl
+}
+
+// Download file
+export const downloadFile = async (bucket: string, path: string) => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .download(path)
+
+  return { data, error }
+}
+
+// Delete file
+export const deleteFile = async (bucket: string, path: string) => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .remove([path])
+
+  return { data, error }
 } 
