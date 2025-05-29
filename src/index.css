@@ -49,6 +49,32 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* QA-specific color variables */
+    --severity-critical: 0 84% 60%;
+    --severity-major: 39 100% 57%;
+    --severity-minor: 48 100% 67%;
+    --severity-info: 213 100% 67%;
+
+    --status-success: 142 76% 36%;
+    --status-success-light: 143 85% 96%;
+    --status-warning: 38 92% 50%;
+    --status-warning-light: 48 100% 96%;
+    --status-error: 0 84% 60%;
+    --status-error-light: 0 100% 97%;
+    --status-processing: 213 94% 68%;
+    --status-processing-light: 213 100% 97%;
+
+    --mqm-excellent: 143 85% 36%;
+    --mqm-good: 89 85% 36%;
+    --mqm-fair: 48 100% 50%;
+    --mqm-poor: 39 100% 57%;
+    --mqm-unacceptable: 0 84% 60%;
+
+    --translation-source: 213 27% 84%;
+    --translation-target: 142 20% 85%;
+    --translation-highlight: 48 100% 88%;
+    --translation-error: 0 100% 95%;
   }
 
   .dark {
@@ -87,6 +113,32 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* QA-specific dark mode colors */
+    --severity-critical: 0 62% 50%;
+    --severity-major: 39 100% 47%;
+    --severity-minor: 48 100% 57%;
+    --severity-info: 213 100% 57%;
+
+    --status-success: 142 76% 26%;
+    --status-success-light: 143 85% 16%;
+    --status-warning: 38 92% 40%;
+    --status-warning-light: 48 100% 16%;
+    --status-error: 0 84% 50%;
+    --status-error-light: 0 100% 17%;
+    --status-processing: 213 94% 58%;
+    --status-processing-light: 213 100% 17%;
+
+    --mqm-excellent: 143 85% 26%;
+    --mqm-good: 89 85% 26%;
+    --mqm-fair: 48 100% 40%;
+    --mqm-poor: 39 100% 47%;
+    --mqm-unacceptable: 0 84% 50%;
+
+    --translation-source: 213 27% 24%;
+    --translation-target: 142 20% 25%;
+    --translation-highlight: 48 100% 28%;
+    --translation-error: 0 100% 25%;
   }
 }
 
@@ -97,5 +149,64 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Custom QA component styles */
+@layer components {
+  .severity-critical {
+    @apply text-red-600 bg-red-50 border-red-200;
+    color: hsl(var(--severity-critical));
+  }
+
+  .severity-major {
+    @apply text-orange-600 bg-orange-50 border-orange-200;
+    color: hsl(var(--severity-major));
+  }
+
+  .severity-minor {
+    @apply text-yellow-600 bg-yellow-50 border-yellow-200;
+    color: hsl(var(--severity-minor));
+  }
+
+  .severity-info {
+    @apply text-blue-600 bg-blue-50 border-blue-200;
+    color: hsl(var(--severity-info));
+  }
+
+  .status-success {
+    color: hsl(var(--status-success));
+    background-color: hsl(var(--status-success-light));
+  }
+
+  .status-warning {
+    color: hsl(var(--status-warning));
+    background-color: hsl(var(--status-warning-light));
+  }
+
+  .status-error {
+    color: hsl(var(--status-error));
+    background-color: hsl(var(--status-error-light));
+  }
+
+  .status-processing {
+    color: hsl(var(--status-processing));
+    background-color: hsl(var(--status-processing-light));
+  }
+
+  .translation-source {
+    background-color: hsl(var(--translation-source));
+  }
+
+  .translation-target {
+    background-color: hsl(var(--translation-target));
+  }
+
+  .translation-highlight {
+    background-color: hsl(var(--translation-highlight));
+  }
+
+  .translation-error {
+    background-color: hsl(var(--translation-error));
   }
 }

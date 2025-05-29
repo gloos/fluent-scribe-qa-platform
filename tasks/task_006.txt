@@ -1,6 +1,6 @@
 # Task ID: 6
 # Title: Design Database Schema
-# Status: pending
+# Status: in-progress
 # Dependencies: None
 # Priority: medium
 # Description: Create a database schema for user accounts, project metadata, and quality assessment results.

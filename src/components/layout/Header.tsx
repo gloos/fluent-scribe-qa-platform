@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,12 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, User, Settings, LogOut, Menu, X } from "lucide-react";
+import { FileText, User, Settings, LogOut, Menu, X, Shield } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useRBAC } from "@/hooks/useRBAC";
+import { sessionManager } from "@/lib/sessionManager";
+import { toast } from "@/hooks/use-toast";
+import { Permission } from "@/lib/rbac";
+import PermissionGuard from "@/components/PermissionGuard";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
-  const isAuthenticated = true; // This would come from auth context
+  const { user, isAuthenticated, signOut } = useAuth();
+  const { userProfile, hasPermission, getRoleDisplayName } = useRBAC();
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },
@@ -24,6 +31,72 @@ const Header = () => {
     { name: "Reports", href: "/reports" },
     { name: "Billing", href: "/billing" },
   ];
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    try {
+      setIsLoggingOut(true);
+      
+      toast({
+        title: "Logging out...",
+        description: "Securely ending your session.",
+        variant: "default"
+      });
+
+      // Use session manager for secure logout
+      const result = await sessionManager.secureLogout();
+      
+      if (result.success) {
+        // Also call the auth hook's signOut for consistency
+        await signOut();
+        
+        toast({
+          title: "Logged out successfully",
+          description: "You have been securely logged out.",
+          variant: "default"
+        });
+      } else {
+        // Even if session manager fails, try the auth signOut
+        await signOut();
+        
+        toast({
+          title: "Logged out",
+          description: "Session ended. Please log in again if needed.",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      
+      // Force logout even if there's an error
+      await signOut();
+      
+      toast({
+        title: "Logout Error",
+        description: "There was an issue logging out, but your session has been cleared.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Helper function to get user's initials
+  const getUserInitials = () => {
+    if (userProfile?.full_name) {
+      return userProfile.full_name
+        .split(' ')
+        .map(name => name[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -52,42 +125,88 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
+            <PermissionGuard permission={Permission.VIEW_USERS}>
+              <Link
+                to="/admin/users"
+                className={`text-sm font-medium transition-colors ${
+                  location.pathname === "/admin/users"
+                    ? "text-blue-600"
+                    : "text-gray-700 hover:text-blue-600"
+                }`}
+              >
+                User Management
+              </Link>
+            </PermissionGuard>
           </nav>
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
-            {isAuthenticated ? (
+            {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/avatar.jpg" alt="User" />
-                      <AvatarFallback>JD</AvatarFallback>
+                      <AvatarImage src={undefined} alt={userProfile?.full_name || user.email} />
+                      <AvatarFallback>{getUserInitials()}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56 bg-white" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">John Doe</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        john.doe@example.com
+                      <p className="text-sm font-medium leading-none">
+                        {userProfile?.full_name || 'No name provided'}
                       </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                      {userProfile?.role && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Shield className="h-3 w-3 text-gray-500" />
+                          <span className="text-xs text-gray-500">
+                            {getRoleDisplayName(userProfile.role)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
+                  <PermissionGuard permission={Permission.VIEW_USERS}>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/users" className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>User Management</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </PermissionGuard>
+                  <PermissionGuard permission={Permission.VIEW_SYSTEM_LOGS}>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/security" className="flex items-center">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Security Admin</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </PermissionGuard>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleLogout} 
+                    className="cursor-pointer"
+                    disabled={isLoggingOut}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -128,6 +247,15 @@ const Header = () => {
                   {item.name}
                 </Link>
               ))}
+              <PermissionGuard permission={Permission.VIEW_USERS}>
+                <Link
+                  to="/admin/users"
+                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  User Management
+                </Link>
+              </PermissionGuard>
             </div>
           </div>
         )}
