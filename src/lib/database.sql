@@ -105,6 +105,275 @@ ALTER TABLE public.profiles
 ADD CONSTRAINT fk_profiles_organization_id 
 FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
+-- Create projects table for grouping QA sessions
+CREATE TABLE IF NOT EXISTS public.projects (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    slug TEXT UNIQUE NOT NULL, -- URL-friendly identifier
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
+    
+    -- Business context
+    client_name TEXT,
+    project_type TEXT DEFAULT 'translation' CHECK (project_type IN ('translation', 'review', 'post_editing', 'terminology', 'style_guide')),
+    priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    
+    -- Timeline
+    start_date DATE,
+    end_date DATE,
+    deadline DATE,
+    
+    -- Status and progress
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'on_hold', 'completed', 'cancelled', 'archived')),
+    progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+    
+    -- QA Settings - default values for sessions in this project
+    default_qa_settings JSONB DEFAULT '{"autoAnalyze": true, "severity": "major", "mqmThreshold": 25}',
+    quality_threshold INTEGER DEFAULT 85, -- Minimum acceptable quality score
+    
+    -- Metadata
+    tags TEXT[], -- Array of tags for categorization
+    metadata JSONB DEFAULT '{}', -- Flexible metadata storage
+    
+    -- Relationships and permissions
+    created_by UUID REFERENCES public.profiles(id),
+    updated_by UUID REFERENCES public.profiles(id),
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create project_members table for user assignments and permissions
+CREATE TABLE IF NOT EXISTS public.project_members (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    
+    -- Role in project
+    role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'manager', 'qa_lead', 'translator', 'reviewer', 'member')),
+    
+    -- Permissions
+    permissions JSONB DEFAULT '{"read": true, "write": false, "delete": false, "manage": false}',
+    
+    -- Assignment details
+    assigned_by UUID REFERENCES public.profiles(id),
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Status
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
+    
+    -- Unique constraint to prevent duplicate assignments
+    UNIQUE(project_id, user_id)
+);
+
+-- Create project_milestones table for tracking project phases
+CREATE TABLE IF NOT EXISTS public.project_milestones (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    
+    -- Timeline
+    due_date DATE,
+    completed_date DATE,
+    
+    -- Status
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue', 'cancelled')),
+    
+    -- Progress
+    completion_percentage INTEGER DEFAULT 0 CHECK (completion_percentage >= 0 AND completion_percentage <= 100),
+    
+    -- Order for display
+    sort_order INTEGER DEFAULT 0,
+    
+    -- Audit fields
+    created_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Update qa_sessions table to reference projects
+ALTER TABLE public.qa_sessions 
+ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL;
+
+-- Create assessment_criteria table for configurable quality standards
+CREATE TABLE IF NOT EXISTS public.assessment_criteria (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    framework TEXT DEFAULT 'MQM' CHECK (framework IN ('MQM', 'DQF', 'CUSTOM', 'LISA_QA', 'SAE_J2450')),
+    version TEXT DEFAULT '1.0',
+    
+    -- Ownership and scope
+    organization_id UUID REFERENCES public.organizations(id),
+    project_id UUID REFERENCES public.projects(id), -- Criteria can be project-specific
+    is_global BOOLEAN DEFAULT FALSE, -- Global criteria available to all
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    -- Criteria definition
+    criteria_config JSONB NOT NULL DEFAULT '{}', -- Detailed criteria configuration
+    weight_distribution JSONB DEFAULT '{}', -- How different criteria are weighted
+    
+    -- Scoring configuration
+    max_score DECIMAL(5,2) DEFAULT 100.00,
+    passing_threshold DECIMAL(5,2) DEFAULT 85.00,
+    
+    -- Metadata
+    tags TEXT[],
+    metadata JSONB DEFAULT '{}',
+    
+    -- Audit fields
+    created_by UUID REFERENCES public.profiles(id),
+    updated_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create assessment_templates table for reusable assessment configurations
+CREATE TABLE IF NOT EXISTS public.assessment_templates (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    
+    -- Template configuration
+    criteria_id UUID REFERENCES public.assessment_criteria(id) ON DELETE CASCADE,
+    template_config JSONB NOT NULL DEFAULT '{}', -- Assessment workflow configuration
+    
+    -- Scope and usage
+    organization_id UUID REFERENCES public.organizations(id),
+    is_public BOOLEAN DEFAULT FALSE,
+    usage_count INTEGER DEFAULT 0,
+    
+    -- Audit fields
+    created_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create assessment_results table for normalized assessment data
+CREATE TABLE IF NOT EXISTS public.assessment_results (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id UUID REFERENCES public.qa_sessions(id) ON DELETE CASCADE,
+    criteria_id UUID REFERENCES public.assessment_criteria(id),
+    
+    -- Assessment metadata
+    assessment_type TEXT DEFAULT 'automatic' CHECK (assessment_type IN ('automatic', 'manual', 'hybrid', 'review')),
+    assessor_id UUID REFERENCES public.profiles(id), -- Who performed the assessment
+    review_status TEXT DEFAULT 'pending' CHECK (review_status IN ('pending', 'in_progress', 'completed', 'approved', 'rejected')),
+    
+    -- Overall scores
+    overall_score DECIMAL(5,2),
+    mqm_score DECIMAL(5,2),
+    fluency_score DECIMAL(5,2),
+    adequacy_score DECIMAL(5,2),
+    
+    -- Detailed metrics
+    total_segments INTEGER DEFAULT 0,
+    assessed_segments INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    warning_count INTEGER DEFAULT 0,
+    suggestion_count INTEGER DEFAULT 0,
+    
+    -- Score breakdown
+    score_breakdown JSONB DEFAULT '{}', -- Detailed score per criterion
+    quality_metrics JSONB DEFAULT '{}', -- Additional quality metrics
+    
+    -- Assessment metadata
+    assessment_duration INTEGER, -- Time spent in seconds
+    confidence_level DECIMAL(3,2) DEFAULT 0.85, -- Confidence in assessment
+    
+    -- Workflow tracking
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    approved_by UUID REFERENCES public.profiles(id),
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create assessment_segments table for segment-level assessment data
+CREATE TABLE IF NOT EXISTS public.assessment_segments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    assessment_result_id UUID REFERENCES public.assessment_results(id) ON DELETE CASCADE,
+    session_id UUID REFERENCES public.qa_sessions(id) ON DELETE CASCADE,
+    
+    -- Segment identification
+    segment_id TEXT NOT NULL, -- XLIFF segment ID
+    segment_index INTEGER, -- Position in file
+    
+    -- Content
+    source_text TEXT NOT NULL,
+    target_text TEXT NOT NULL,
+    context_text TEXT, -- Additional context
+    
+    -- Segment-level scores
+    segment_score DECIMAL(5,2),
+    fluency_score DECIMAL(5,2),
+    adequacy_score DECIMAL(5,2),
+    
+    -- Metrics
+    word_count INTEGER DEFAULT 0,
+    character_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    warning_count INTEGER DEFAULT 0,
+    
+    -- Assessment details
+    issues_found JSONB DEFAULT '[]', -- Array of issues found in this segment
+    suggestions JSONB DEFAULT '[]', -- Improvement suggestions
+    notes TEXT, -- Assessor notes
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    
+    -- Audit fields
+    assessed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    assessed_by UUID REFERENCES public.profiles(id),
+    
+    -- Index for fast segment lookups
+    UNIQUE(assessment_result_id, segment_id)
+);
+
+-- Enhance qa_errors table with better categorization and assessment links
+ALTER TABLE public.qa_errors 
+ADD COLUMN IF NOT EXISTS assessment_result_id UUID REFERENCES public.assessment_results(id),
+ADD COLUMN IF NOT EXISTS assessment_segment_id UUID REFERENCES public.assessment_segments(id),
+ADD COLUMN IF NOT EXISTS error_weight DECIMAL(3,2) DEFAULT 1.0,
+ADD COLUMN IF NOT EXISTS mqm_category TEXT,
+ADD COLUMN IF NOT EXISTS mqm_severity TEXT,
+ADD COLUMN IF NOT EXISTS is_critical BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS reviewer_id UUID REFERENCES public.profiles(id),
+ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'open' CHECK (status IN ('open', 'fixed', 'accepted', 'disputed', 'wont_fix'));
+
+-- Create assessment_comparisons table for comparative analysis
+CREATE TABLE IF NOT EXISTS public.assessment_comparisons (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    
+    -- Comparison configuration
+    comparison_type TEXT DEFAULT 'before_after' CHECK (comparison_type IN ('before_after', 'ab_test', 'multi_version', 'assessor_agreement')),
+    
+    -- Related assessments
+    baseline_result_id UUID REFERENCES public.assessment_results(id),
+    target_result_id UUID REFERENCES public.assessment_results(id),
+    
+    -- Results
+    comparison_results JSONB DEFAULT '{}',
+    improvement_percentage DECIMAL(5,2),
+    statistical_significance DECIMAL(3,2),
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    
+    -- Audit fields
+    created_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create qa_sessions table
 CREATE TABLE IF NOT EXISTS public.qa_sessions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -180,13 +449,143 @@ CREATE INDEX IF NOT EXISTS idx_organizations_domain ON public.organizations(doma
 CREATE INDEX IF NOT EXISTS idx_organizations_status ON public.organizations(status);
 CREATE INDEX IF NOT EXISTS idx_organizations_subscription_tier ON public.organizations(subscription_tier);
 
+-- Projects table indexes
+CREATE INDEX IF NOT EXISTS idx_projects_slug ON public.projects(slug);
+CREATE INDEX IF NOT EXISTS idx_projects_organization_id ON public.projects(organization_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON public.projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_priority ON public.projects(priority);
+CREATE INDEX IF NOT EXISTS idx_projects_project_type ON public.projects(project_type);
+CREATE INDEX IF NOT EXISTS idx_projects_created_by ON public.projects(created_by);
+CREATE INDEX IF NOT EXISTS idx_projects_start_date ON public.projects(start_date);
+CREATE INDEX IF NOT EXISTS idx_projects_end_date ON public.projects(end_date);
+CREATE INDEX IF NOT EXISTS idx_projects_deadline ON public.projects(deadline);
+CREATE INDEX IF NOT EXISTS idx_projects_created_at ON public.projects(created_at);
+
+-- Project members table indexes
+CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON public.project_members(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON public.project_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_role ON public.project_members(role);
+CREATE INDEX IF NOT EXISTS idx_project_members_status ON public.project_members(status);
+
+-- Project milestones table indexes
+CREATE INDEX IF NOT EXISTS idx_project_milestones_project_id ON public.project_milestones(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_milestones_status ON public.project_milestones(status);
+CREATE INDEX IF NOT EXISTS idx_project_milestones_due_date ON public.project_milestones(due_date);
+CREATE INDEX IF NOT EXISTS idx_project_milestones_sort_order ON public.project_milestones(sort_order);
+
+-- Assessment criteria table indexes
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_organization_id ON public.assessment_criteria(organization_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_project_id ON public.assessment_criteria(project_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_framework ON public.assessment_criteria(framework);
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_is_global ON public.assessment_criteria(is_global);
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_is_active ON public.assessment_criteria(is_active);
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_created_by ON public.assessment_criteria(created_by);
+
+-- Assessment templates table indexes
+CREATE INDEX IF NOT EXISTS idx_assessment_templates_criteria_id ON public.assessment_templates(criteria_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_templates_organization_id ON public.assessment_templates(organization_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_templates_is_public ON public.assessment_templates(is_public);
+CREATE INDEX IF NOT EXISTS idx_assessment_templates_created_by ON public.assessment_templates(created_by);
+
+-- Assessment results table indexes
+CREATE INDEX IF NOT EXISTS idx_assessment_results_session_id ON public.assessment_results(session_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_criteria_id ON public.assessment_results(criteria_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_assessor_id ON public.assessment_results(assessor_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_assessment_type ON public.assessment_results(assessment_type);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_review_status ON public.assessment_results(review_status);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_overall_score ON public.assessment_results(overall_score);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_mqm_score ON public.assessment_results(mqm_score);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_created_at ON public.assessment_results(created_at);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_submitted_at ON public.assessment_results(submitted_at);
+CREATE INDEX IF NOT EXISTS idx_assessment_results_approved_by ON public.assessment_results(approved_by);
+
+-- Assessment segments table indexes  
+CREATE INDEX IF NOT EXISTS idx_assessment_segments_assessment_result_id ON public.assessment_segments(assessment_result_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_segments_session_id ON public.assessment_segments(session_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_segments_segment_index ON public.assessment_segments(segment_index);
+CREATE INDEX IF NOT EXISTS idx_assessment_segments_assessed_by ON public.assessment_segments(assessed_by);
+CREATE INDEX IF NOT EXISTS idx_assessment_segments_segment_score ON public.assessment_segments(segment_score);
+
+-- Enhanced qa_errors table indexes
+CREATE INDEX IF NOT EXISTS idx_qa_errors_assessment_result_id ON public.qa_errors(assessment_result_id);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_assessment_segment_id ON public.qa_errors(assessment_segment_id);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_mqm_category ON public.qa_errors(mqm_category);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_mqm_severity ON public.qa_errors(mqm_severity);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_is_critical ON public.qa_errors(is_critical);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_status ON public.qa_errors(status);
+CREATE INDEX IF NOT EXISTS idx_qa_errors_reviewer_id ON public.qa_errors(reviewer_id);
+
+-- Assessment comparisons table indexes
+CREATE INDEX IF NOT EXISTS idx_assessment_comparisons_baseline_result_id ON public.assessment_comparisons(baseline_result_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_comparisons_target_result_id ON public.assessment_comparisons(target_result_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_comparisons_comparison_type ON public.assessment_comparisons(comparison_type);
+CREATE INDEX IF NOT EXISTS idx_assessment_comparisons_created_by ON public.assessment_comparisons(created_by);
+
 -- QA Sessions indexes
 CREATE INDEX IF NOT EXISTS idx_qa_sessions_user_id ON public.qa_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_qa_sessions_project_id ON public.qa_sessions(project_id);
 CREATE INDEX IF NOT EXISTS idx_qa_sessions_status ON public.qa_sessions(analysis_status);
 CREATE INDEX IF NOT EXISTS idx_qa_sessions_created_at ON public.qa_sessions(created_at);
 CREATE INDEX IF NOT EXISTS idx_qa_errors_session_id ON public.qa_errors(session_id);
 CREATE INDEX IF NOT EXISTS idx_qa_errors_severity ON public.qa_errors(severity);
 CREATE INDEX IF NOT EXISTS idx_file_uploads_session_id ON public.file_uploads(session_id);
+
+-- High-Priority Composite Indexes for Performance Optimization
+
+-- Project dashboard queries (organization + status + priority)
+CREATE INDEX IF NOT EXISTS idx_projects_org_status_priority 
+ON public.projects(organization_id, status, priority);
+
+-- QA session filtering (user + project + status)
+CREATE INDEX IF NOT EXISTS idx_qa_sessions_user_project_status 
+ON public.qa_sessions(user_id, project_id, analysis_status);
+
+-- Assessment workflow queries (session + status + type)
+CREATE INDEX IF NOT EXISTS idx_assessment_results_session_status_type 
+ON public.assessment_results(session_id, review_status, assessment_type);
+
+-- Error analysis queries (session + severity + status)
+CREATE INDEX IF NOT EXISTS idx_qa_errors_session_severity_status 
+ON public.qa_errors(session_id, severity, status);
+
+-- Time-based project queries (org + deadline for dashboard)
+CREATE INDEX IF NOT EXISTS idx_projects_org_deadline 
+ON public.projects(organization_id, deadline) WHERE deadline IS NOT NULL;
+
+-- Active user sessions (user + status + created_at for recent activity)
+CREATE INDEX IF NOT EXISTS idx_qa_sessions_user_status_created 
+ON public.qa_sessions(user_id, analysis_status, created_at);
+
+-- JSONB Indexing for Flexible Queries
+
+-- Project tags for categorization and filtering
+CREATE INDEX IF NOT EXISTS idx_projects_tags_gin 
+ON public.projects USING gin(tags);
+
+-- Assessment criteria configuration searches
+CREATE INDEX IF NOT EXISTS idx_assessment_criteria_config_gin 
+ON public.assessment_criteria USING gin(criteria_config);
+
+-- QA session analysis results searches
+CREATE INDEX IF NOT EXISTS idx_qa_sessions_analysis_results_gin 
+ON public.qa_sessions USING gin(analysis_results);
+
+-- Partial Indexes for High-Frequency Conditional Queries
+
+-- Active sessions only (most common query pattern)
+CREATE INDEX IF NOT EXISTS idx_qa_sessions_active_created 
+ON public.qa_sessions(created_at, user_id) 
+WHERE analysis_status IN ('pending', 'processing', 'completed');
+
+-- Critical errors requiring immediate attention
+CREATE INDEX IF NOT EXISTS idx_qa_errors_critical 
+ON public.qa_errors(session_id, created_at) 
+WHERE severity = 'critical' AND status = 'open';
+
+-- Pending assessments for workflow management
+CREATE INDEX IF NOT EXISTS idx_assessment_results_pending 
+ON public.assessment_results(assessor_id, submitted_at) 
+WHERE review_status = 'pending';
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -301,6 +700,135 @@ CREATE POLICY "Users can update own preferences" ON public.user_preferences
 CREATE POLICY "Users can insert own preferences" ON public.user_preferences
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Enable RLS on new assessment tables
+ALTER TABLE public.assessment_criteria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assessment_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assessment_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assessment_segments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assessment_comparisons ENABLE ROW LEVEL SECURITY;
+
+-- Assessment Criteria: Users can view global/org criteria, create within their org
+CREATE POLICY "Users can view assessment criteria" ON public.assessment_criteria
+    FOR SELECT USING (
+        is_global = TRUE 
+        OR organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE profiles.id = auth.uid()
+        )
+        OR created_by = auth.uid()
+    );
+
+CREATE POLICY "Users can create assessment criteria" ON public.assessment_criteria
+    FOR INSERT WITH CHECK (
+        created_by = auth.uid()
+        AND (
+            organization_id IN (
+                SELECT organization_id FROM public.profiles 
+                WHERE profiles.id = auth.uid()
+            )
+            OR is_global = FALSE
+        )
+    );
+
+CREATE POLICY "Users can update own assessment criteria" ON public.assessment_criteria
+    FOR UPDATE USING (
+        created_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+            AND profiles.organization_id = assessment_criteria.organization_id
+        )
+    );
+
+-- Assessment Templates: Users can view public/org templates, create own
+CREATE POLICY "Users can view assessment templates" ON public.assessment_templates
+    FOR SELECT USING (
+        is_public = TRUE
+        OR organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE profiles.id = auth.uid()
+        )
+        OR created_by = auth.uid()
+    );
+
+CREATE POLICY "Users can create assessment templates" ON public.assessment_templates
+    FOR INSERT WITH CHECK (created_by = auth.uid());
+
+CREATE POLICY "Users can update own assessment templates" ON public.assessment_templates
+    FOR UPDATE USING (created_by = auth.uid());
+
+-- Assessment Results: Users can access results from their sessions or org projects
+CREATE POLICY "Users can view assessment results" ON public.assessment_results
+    FOR SELECT USING (
+        assessor_id = auth.uid()
+        OR session_id IN (
+            SELECT id FROM public.qa_sessions 
+            WHERE qa_sessions.user_id = auth.uid()
+        )
+        OR session_id IN (
+            SELECT qa_sessions.id FROM public.qa_sessions
+            JOIN public.projects ON qa_sessions.project_id = projects.id
+            JOIN public.project_members ON projects.id = project_members.project_id
+            WHERE project_members.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create assessment results" ON public.assessment_results
+    FOR INSERT WITH CHECK (
+        assessor_id = auth.uid()
+        OR session_id IN (
+            SELECT id FROM public.qa_sessions 
+            WHERE qa_sessions.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update assessment results" ON public.assessment_results
+    FOR UPDATE USING (
+        assessor_id = auth.uid()
+        OR approved_by = auth.uid()
+    );
+
+-- Assessment Segments: Users can access segments from their assessment results
+CREATE POLICY "Users can view assessment segments" ON public.assessment_segments
+    FOR SELECT USING (
+        assessed_by = auth.uid()
+        OR assessment_result_id IN (
+            SELECT id FROM public.assessment_results
+            WHERE assessor_id = auth.uid()
+        )
+        OR session_id IN (
+            SELECT id FROM public.qa_sessions 
+            WHERE qa_sessions.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create assessment segments" ON public.assessment_segments
+    FOR INSERT WITH CHECK (
+        assessed_by = auth.uid()
+        OR assessment_result_id IN (
+            SELECT id FROM public.assessment_results
+            WHERE assessor_id = auth.uid()
+        )
+    );
+
+-- Assessment Comparisons: Users can view comparisons they created or for their assessments
+CREATE POLICY "Users can view assessment comparisons" ON public.assessment_comparisons
+    FOR SELECT USING (
+        created_by = auth.uid()
+        OR baseline_result_id IN (
+            SELECT id FROM public.assessment_results
+            WHERE assessor_id = auth.uid()
+        )
+        OR target_result_id IN (
+            SELECT id FROM public.assessment_results
+            WHERE assessor_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create assessment comparisons" ON public.assessment_comparisons
+    FOR INSERT WITH CHECK (created_by = auth.uid());
+
 -- Create functions for automatic timestamp updates
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
@@ -321,6 +849,28 @@ CREATE TRIGGER qa_sessions_updated_at
 
 CREATE TRIGGER user_preferences_updated_at 
     BEFORE UPDATE ON public.user_preferences
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Project-related triggers
+CREATE TRIGGER projects_updated_at 
+    BEFORE UPDATE ON public.projects
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER project_milestones_updated_at 
+    BEFORE UPDATE ON public.project_milestones
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Assessment-related triggers
+CREATE TRIGGER assessment_criteria_updated_at 
+    BEFORE UPDATE ON public.assessment_criteria
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER assessment_templates_updated_at 
+    BEFORE UPDATE ON public.assessment_templates
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER assessment_results_updated_at 
+    BEFORE UPDATE ON public.assessment_results
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Create function to automatically create user profile
