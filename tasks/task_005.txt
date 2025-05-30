@@ -1,6 +1,6 @@
 # Task ID: 5
 # Title: Develop User Authentication System
-# Status: pending
+# Status: done
 # Dependencies: None
 # Priority: medium
 # Description: Implement secure user registration and login system with role-based access control.

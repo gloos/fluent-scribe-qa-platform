@@ -1,18 +1,12 @@
-// Authentication Component Exports
-export { default as LoginForm } from './LoginForm';
-export { default as SecurityStatusDisplay } from './SecurityStatusDisplay';
-export { default as RateLimitWarning } from './RateLimitWarning';
-export { default as LoginFormFields } from './LoginFormFields';
-export { default as LoginLayout } from './LoginLayout';
+// New Authentication Components (named exports)
+export { RegisterForm } from './RegisterForm';
 
-// Hooks
-export { useLoginForm } from './hooks/useLoginForm';
-export { useLoginSecurity } from './hooks/useLoginSecurity';
+// New Field Components (named exports)
+export { NameFieldsGroup } from './NameFieldsGroup';
+export { EmailField } from './EmailField';
+export { PasswordField } from './PasswordField';
+export { ConfirmPasswordField } from './ConfirmPasswordField';
+export { TermsCheckbox } from './TermsCheckbox';
 
-// Types
-export type {
-  LoginFormData,
-  SecurityInfo,
-  RateLimitInfo,
-  LoginFormErrors
-} from './types'; 
+// New Shared Components (named exports)
+export { AuthLogo } from './AuthLogo'; 
