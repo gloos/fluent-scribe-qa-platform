@@ -25,10 +25,12 @@ export * from './validation';
 // Version-specific parsers
 export { XLIFF12Parser } from './v1.2';
 export { XLIFF20Parser } from './v2.0';
+export { MXLIFFParser } from './mxliff';
 
 // Import to trigger registration (side effect)
 import './v1.2';
 import './v2.0';
+import './mxliff';
 
 // Re-export factory instance as default
 export { xliffParserFactory as default } from './factory'; 
