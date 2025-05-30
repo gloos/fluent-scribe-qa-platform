@@ -1,5 +1,51 @@
 import { supabase } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
+import { toast } from '@/hooks/use-toast';
+
+// Re-export security types that will be used
+export interface RateLimitData {
+  attempts: number;
+  lastAttempt: number;
+  progressiveDelay: number;
+  lockedUntil?: number;
+}
+
+export interface RateLimitResult {
+  allowed: boolean;
+  waitTime?: number;
+  needsCaptcha?: boolean;
+}
+
+export interface RateLimitStatus {
+  attempts: number;
+  remainingAttempts: number;
+  lockedUntil?: number;
+  nextAttemptAllowed?: number;
+}
+
+export interface SecurityEvent {
+  type: SecurityEventType;
+  userId?: string;
+  email?: string;
+  ipAddress: string; // Required to match security types
+  userAgent: string; // Required to match security types
+  deviceFingerprint?: string;
+  timestamp: number;
+  success: boolean;
+  metadata?: Record<string, any>;
+}
+
+export type SecurityEventType = 
+  | 'LOGIN_ATTEMPT'
+  | 'LOGIN_SUCCESS' 
+  | 'LOGIN_FAILURE'
+  | 'ACCOUNT_LOCKED' 
+  | 'SUSPICIOUS_ACTIVITY' 
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'DEVICE_CHANGE' 
+  | 'PASSWORD_RESET'
+  | 'MFA_ENABLED'
+  | 'MFA_DISABLED';
 
 export interface SessionInfo {
   session: Session | null;
@@ -14,6 +60,13 @@ export interface SessionConfig {
   idleTimeout: number; // seconds of inactivity before logout
   autoRefresh: boolean; // whether to auto-refresh sessions
   rememberMe: boolean; // whether session should persist across browser restarts
+  // Security configuration
+  maxLoginAttempts: number;
+  lockoutDuration: number; // milliseconds
+  progressiveDelayBase: number; // milliseconds
+  progressiveDelayMultiplier: number;
+  maxProgressiveDelay: number; // milliseconds
+  captchaThreshold: number; // attempts before requiring captcha
 }
 
 class SessionManager {
@@ -21,7 +74,14 @@ class SessionManager {
     warningThreshold: 300, // 5 minutes
     idleTimeout: 1800, // 30 minutes
     autoRefresh: true,
-    rememberMe: false
+    rememberMe: false,
+    // Security defaults
+    maxLoginAttempts: 5,
+    lockoutDuration: 15 * 60 * 1000, // 15 minutes
+    progressiveDelayBase: 1000, // 1 second
+    progressiveDelayMultiplier: 2,
+    maxProgressiveDelay: 30 * 1000, // 30 seconds
+    captchaThreshold: 3
   };
 
   private idleTimer: NodeJS.Timeout | null = null;
@@ -30,6 +90,10 @@ class SessionManager {
   private sessionWarningCallbacks: Array<(timeLeft: number) => void> = [];
   private sessionExpiredCallbacks: Array<() => void> = [];
   private activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+  
+  // Security state
+  private rateLimitData = new Map<string, RateLimitData>();
+  private securityEventCallbacks: Array<(event: SecurityEvent) => void> = [];
 
   constructor() {
     this.initializeActivityTracking();
@@ -147,6 +211,241 @@ class SessionManager {
       return { success: false, error };
     }
   }
+
+  // =========================
+  // SECURITY METHODS
+  // =========================
+
+  /**
+   * Check if login attempt should be rate limited
+   */
+  public checkRateLimit(identifier: string): RateLimitResult {
+    const now = Date.now();
+    const data = this.rateLimitData.get(identifier);
+
+    if (!data) {
+      // First attempt
+      this.rateLimitData.set(identifier, {
+        attempts: 1,
+        lastAttempt: now,
+        progressiveDelay: 0
+      });
+      return { allowed: true };
+    }
+
+    // Check if account is locked
+    if (data.lockedUntil && now < data.lockedUntil) {
+      const waitTime = data.lockedUntil - now;
+      return { 
+        allowed: false, 
+        waitTime: Math.ceil(waitTime / 1000),
+        needsCaptcha: true
+      };
+    }
+
+    // Check if we need to apply progressive delay
+    if (data.progressiveDelay > 0 && now < data.lastAttempt + data.progressiveDelay) {
+      const waitTime = (data.lastAttempt + data.progressiveDelay) - now;
+      return { 
+        allowed: false, 
+        waitTime: Math.ceil(waitTime / 1000),
+        needsCaptcha: data.attempts >= this.config.captchaThreshold
+      };
+    }
+
+    // Reset if enough time has passed
+    if (now - data.lastAttempt > this.config.lockoutDuration) {
+      this.rateLimitData.set(identifier, {
+        attempts: 1,
+        lastAttempt: now,
+        progressiveDelay: 0
+      });
+      return { allowed: true };
+    }
+
+    // Check if we're within limits
+    if (data.attempts >= this.config.maxLoginAttempts) {
+      // Lock the account
+      this.rateLimitData.set(identifier, {
+        ...data,
+        lockedUntil: now + this.config.lockoutDuration
+      });
+
+      return { 
+        allowed: false, 
+        waitTime: Math.ceil(this.config.lockoutDuration / 1000),
+        needsCaptcha: true
+      };
+    }
+
+    return { 
+      allowed: true,
+      needsCaptcha: data.attempts >= this.config.captchaThreshold
+    };
+  }
+
+  /**
+   * Record a failed login attempt
+   */
+  public recordFailedAttempt(identifier: string): void {
+    const now = Date.now();
+    const data = this.rateLimitData.get(identifier) || {
+      attempts: 0,
+      lastAttempt: now,
+      progressiveDelay: 0
+    };
+
+    const newAttempts = data.attempts + 1;
+    const progressiveDelay = Math.min(
+      this.config.progressiveDelayBase * 
+      Math.pow(this.config.progressiveDelayMultiplier, newAttempts - 1),
+      this.config.maxProgressiveDelay
+    );
+
+    this.rateLimitData.set(identifier, {
+      attempts: newAttempts,
+      lastAttempt: now,
+      progressiveDelay
+    });
+
+    // Log security event
+    this.logSecurityEvent({
+      type: 'LOGIN_FAILURE',
+      email: identifier,
+      ipAddress: this.getClientIP(),
+      userAgent: this.getUserAgent(),
+      timestamp: now,
+      success: false,
+      metadata: { 
+        attempts: newAttempts,
+        progressiveDelay,
+        willLockAfter: this.config.maxLoginAttempts
+      }
+    });
+
+    // Check if we need to lock the account and log that event
+    if (newAttempts >= this.config.maxLoginAttempts) {
+      this.rateLimitData.set(identifier, {
+        attempts: newAttempts,
+        lastAttempt: now,
+        progressiveDelay,
+        lockedUntil: now + this.config.lockoutDuration
+      });
+
+      this.logSecurityEvent({
+        type: 'ACCOUNT_LOCKED',
+        email: identifier,
+        ipAddress: this.getClientIP(),
+        userAgent: this.getUserAgent(),
+        timestamp: now,
+        success: false,
+        metadata: { attempts: newAttempts }
+      });
+    }
+
+    // Show user feedback
+    if (newAttempts >= this.config.maxLoginAttempts - 1) {
+      toast({
+        title: "Account Security Warning",
+        description: `Account will be temporarily locked after ${this.config.maxLoginAttempts - newAttempts + 1} more failed attempt(s).`,
+        variant: "destructive"
+      });
+    }
+  }
+
+  /**
+   * Record a successful login attempt
+   */
+  public recordSuccessfulAttempt(identifier: string, userId?: string): void {
+    const now = Date.now();
+    
+    // Clear rate limiting data on successful login
+    this.rateLimitData.delete(identifier);
+
+    // Log security event
+    this.logSecurityEvent({
+      type: 'LOGIN_SUCCESS',
+      userId,
+      email: identifier,
+      ipAddress: this.getClientIP(),
+      userAgent: this.getUserAgent(),
+      timestamp: now,
+      success: true,
+      metadata: { 
+        rateLimitCleared: true
+      }
+    });
+  }
+
+  /**
+   * Get rate limit status for display
+   */
+  public getRateLimitStatus(identifier: string): RateLimitStatus {
+    const data = this.rateLimitData.get(identifier);
+    
+    if (!data) {
+      return {
+        attempts: 0,
+        remainingAttempts: this.config.maxLoginAttempts
+      };
+    }
+
+    const remainingAttempts = Math.max(0, this.config.maxLoginAttempts - data.attempts);
+    
+    return {
+      attempts: data.attempts,
+      remainingAttempts,
+      lockedUntil: data.lockedUntil,
+      nextAttemptAllowed: data.progressiveDelay > 0 ? data.lastAttempt + data.progressiveDelay : undefined
+    };
+  }
+
+  /**
+   * Clear rate limiting data (for testing or admin override)
+   */
+  public clearRateLimit(identifier: string): void {
+    this.rateLimitData.delete(identifier);
+  }
+
+  /**
+   * Log a security event
+   */
+  private logSecurityEvent(event: SecurityEvent): void {
+    this.securityEventCallbacks.forEach(callback => callback(event));
+  }
+
+  /**
+   * Register callback for security events
+   */
+  public onSecurityEvent(callback: (event: SecurityEvent) => void) {
+    this.securityEventCallbacks.push(callback);
+    return () => {
+      const index = this.securityEventCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.securityEventCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Get client IP address (best effort)
+   */
+  private getClientIP(): string {
+    // In production, this would come from headers set by a reverse proxy
+    // For now, we'll use a placeholder
+    return 'client-ip-placeholder';
+  }
+
+  /**
+   * Get user agent
+   */
+  private getUserAgent(): string {
+    return typeof navigator !== 'undefined' ? navigator.userAgent : 'server';
+  }
+
+  // =========================
+  // SESSION LIFECYCLE METHODS
+  // =========================
 
   /**
    * Start session monitoring (expiration and idle detection)
@@ -344,6 +643,7 @@ class SessionManager {
     this.clearTimers();
     this.sessionWarningCallbacks = [];
     this.sessionExpiredCallbacks = [];
+    this.securityEventCallbacks = [];
   }
 }
 

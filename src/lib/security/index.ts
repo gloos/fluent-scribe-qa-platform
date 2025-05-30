@@ -1,17 +1,17 @@
 // Export all security modules
 export * from './types';
-export * from './SessionManager';
 export * from './DeviceFingerprinting';
 export * from './SecurityLogger';
 export * from './PasswordSecurityService';
 export * from './SecurityHeaders';
 
 // Import modules for unified service
-import { SessionManager } from './SessionManager';
+import { sessionManager, SessionManager } from '../sessionManager'; // Use consolidated session manager
 import { DeviceFingerprinting } from './DeviceFingerprinting';
 import { SecurityLogger } from './SecurityLogger';
 import { PasswordSecurityService } from './PasswordSecurityService';
 import { SecurityHeaders } from './SecurityHeaders';
+import type { SecurityEvent as SecurityEventType } from './types';
 
 /**
  * Unified Security Service that combines all security modules
@@ -23,9 +23,20 @@ export class SecurityService {
   private securityLogger: SecurityLogger;
 
   constructor() {
-    this.sessionManager = new SessionManager();
+    this.sessionManager = sessionManager; // Use the singleton from consolidated session manager
     this.deviceFingerprinting = new DeviceFingerprinting();
     this.securityLogger = new SecurityLogger();
+    
+    // Connect session manager security events to security logger
+    this.sessionManager.onSecurityEvent((event) => {
+      // Convert the session manager event to security logger event format
+      const securityEvent: SecurityEventType = {
+        ...event,
+        ipAddress: event.ipAddress,
+        userAgent: event.userAgent
+      };
+      this.securityLogger.logSecurityEvent(securityEvent);
+    });
   }
 
   // Session Management Methods
@@ -34,10 +45,7 @@ export class SecurityService {
   }
 
   public recordFailedAttempt(identifier: string) {
-    return this.sessionManager.recordFailedAttempt(
-      identifier, 
-      (event) => this.securityLogger.logSecurityEvent(event)
-    );
+    return this.sessionManager.recordFailedAttempt(identifier);
   }
 
   public recordSuccessfulAttempt(identifier: string, userId?: string) {
@@ -48,20 +56,26 @@ export class SecurityService {
       (event) => this.securityLogger.logSecurityEvent(event)
     );
 
-    // Record successful login
-    this.sessionManager.recordSuccessfulAttempt(
-      identifier,
-      userId,
-      (event) => this.securityLogger.logSecurityEvent({
-        ...event,
-        deviceFingerprint: fingerprint.hash,
+    // Record successful login with additional device information
+    this.sessionManager.recordSuccessfulAttempt(identifier, userId);
+    
+    // Log additional device information if it's a new device
+    if (isNewDevice) {
+      this.securityLogger.logSecurityEvent({
+        type: 'DEVICE_CHANGE',
+        userId,
+        email: identifier,
+        ipAddress: 'client-ip-placeholder',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'server',
+        timestamp: Date.now(),
+        success: true,
         metadata: {
-          ...event.metadata,
+          deviceFingerprint: fingerprint.hash,
           isNewDevice,
           deviceCount: this.deviceFingerprinting.getDeviceStats().totalDevices
         }
-      })
-    );
+      });
+    }
   }
 
   public getRateLimitStatus(identifier: string) {
@@ -90,7 +104,7 @@ export class SecurityService {
   }
 
   // Security Logging Methods
-  public logSecurityEvent(event: import('./types').SecurityEvent) {
+  public logSecurityEvent(event: SecurityEventType) {
     return this.securityLogger.logSecurityEvent(event);
   }
 
@@ -169,8 +183,8 @@ if (typeof window !== 'undefined') {
   SecurityService.setSecurityHeaders();
 }
 
-// Export individual services for direct use
-export const sessionManager = new SessionManager();
+// Export individual services for direct use - use consolidated session manager
+export { sessionManager } from '../sessionManager';
 export const deviceFingerprinting = new DeviceFingerprinting();
 export const securityLogger = new SecurityLogger();
 
