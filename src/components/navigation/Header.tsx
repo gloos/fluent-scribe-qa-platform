@@ -12,14 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from '@/components/ui/navigation-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { 
   Menu, 
@@ -27,14 +19,9 @@ import {
   Settings, 
   LogOut, 
   User, 
-  FileText, 
-  BarChart3, 
-  Upload,
-  Zap,
-  ChevronDown,
-  MessageSquare,
-  AlertTriangle
+  Zap
 } from 'lucide-react'
+import { RoleBasedNavigationMenu } from './RoleBasedNavigationMenu'
 
 interface HeaderProps {
   className?: string
@@ -47,88 +34,6 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
-interface NavigationItem {
-  title: string
-  href: string
-  description?: string
-  icon?: React.ReactNode
-  badge?: string
-  children?: NavigationItem[]
-}
-
-const navigationItems: NavigationItem[] = [
-  {
-    title: 'Dashboard',
-    href: '/dashboard',
-    description: 'Overview of your QA sessions and metrics',
-    icon: <BarChart3 className="h-4 w-4" />
-  },
-  {
-    title: 'QA Sessions',
-    href: '/sessions',
-    description: 'Manage and review your analysis sessions',
-    icon: <FileText className="h-4 w-4" />,
-    children: [
-      {
-        title: 'All Sessions',
-        href: '/sessions',
-        description: 'View all QA sessions'
-      },
-      {
-        title: 'Active Sessions',
-        href: '/sessions?status=processing',
-        description: 'Currently processing files'
-      },
-      {
-        title: 'Completed',
-        href: '/sessions?status=completed',
-        description: 'Finished analysis sessions'
-      },
-      {
-        title: 'QA Error Analysis',
-        href: '/qa-errors',
-        description: 'Review errors with feedback system'
-      }
-    ]
-  },
-  {
-    title: 'Upload',
-    href: '/upload',
-    description: 'Upload new XLIFF files for analysis',
-    icon: <Upload className="h-4 w-4" />
-  },
-  {
-    title: 'Analytics',
-    href: '/analytics',
-    description: 'Detailed analytics and reporting',
-    icon: <BarChart3 className="h-4 w-4" />,
-    children: [
-      {
-        title: 'Quality Metrics',
-        href: '/analytics/quality',
-        description: 'MQM scores and trends'
-      },
-      {
-        title: 'Error Analysis',
-        href: '/analytics/errors',
-        description: 'Error patterns and insights'
-      },
-      {
-        title: 'Performance',
-        href: '/analytics/performance',
-        description: 'Processing time and efficiency'
-      }
-    ]
-  },
-  {
-    title: 'Feedback',
-    href: '/feedback-demo',
-    description: 'User feedback system demonstration',
-    icon: <MessageSquare className="h-4 w-4" />,
-    badge: 'New'
-  }
-]
-
 export const Header: React.FC<HeaderProps> = ({
   className,
   user,
@@ -136,13 +41,6 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout
 }) => {
   const location = useLocation()
-
-  const isActivePath = (href: string) => {
-    if (href === '/' || href === '/dashboard') {
-      return location.pathname === '/' || location.pathname === '/dashboard'
-    }
-    return location.pathname.startsWith(href)
-  }
 
   const MobileNavigation = () => (
     <Sheet>
@@ -162,43 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <nav className="space-y-1">
-          {navigationItems.map((item) => (
-            <div key={item.href}>
-              <Link
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                  isActivePath(item.href)
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
-                )}
-              >
-                {item.icon}
-                {item.title}
-                {item.badge && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-              
-              {item.children && isActivePath(item.href) && (
-                <div className="ml-6 mt-1 space-y-1">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      to={child.href}
-                      className="block rounded-lg px-3 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      {child.title}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </nav>
+        <RoleBasedNavigationMenu isMobile={true} />
       </SheetContent>
     </Sheet>
   )
@@ -228,85 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex">
-          <NavigationMenu>
-            <NavigationMenuList>
-              {navigationItems.map((item) => (
-                <NavigationMenuItem key={item.href}>
-                  {item.children ? (
-                    <>
-                      <NavigationMenuTrigger 
-                        className={cn(
-                          isActivePath(item.href) && "bg-accent text-accent-foreground"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {item.icon}
-                          {item.title}
-                        </div>
-                      </NavigationMenuTrigger>
-                      <NavigationMenuContent>
-                        <div className="grid w-80 gap-3 p-4">
-                          <div className="row-span-3">
-                            <NavigationMenuLink asChild>
-                              <Link
-                                to={item.href}
-                                className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
-                              >
-                                {item.icon}
-                                <div className="mb-2 mt-4 text-lg font-medium">
-                                  {item.title}
-                                </div>
-                                <p className="text-sm leading-tight text-muted-foreground">
-                                  {item.description}
-                                </p>
-                              </Link>
-                            </NavigationMenuLink>
-                          </div>
-                          <div className="space-y-1">
-                            {item.children.map((child) => (
-                              <NavigationMenuLink key={child.href} asChild>
-                                <Link
-                                  to={child.href}
-                                  className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                                >
-                                  <div className="text-sm font-medium leading-none">
-                                    {child.title}
-                                  </div>
-                                  <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                                    {child.description}
-                                  </p>
-                                </Link>
-                              </NavigationMenuLink>
-                            ))}
-                          </div>
-                        </div>
-                      </NavigationMenuContent>
-                    </>
-                  ) : (
-                    <NavigationMenuLink asChild>
-                      <Link
-                        to={item.href}
-                        className={cn(
-                          "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
-                          isActivePath(item.href) && "bg-accent text-accent-foreground"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {item.icon}
-                          {item.title}
-                          {item.badge && (
-                            <Badge variant="secondary" className="ml-1">
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </div>
-                      </Link>
-                    </NavigationMenuLink>
-                  )}
-                </NavigationMenuItem>
-              ))}
-            </NavigationMenuList>
-          </NavigationMenu>
+          <RoleBasedNavigationMenu />
         </div>
 
         {/* Right side actions */}

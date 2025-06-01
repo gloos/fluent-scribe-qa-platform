@@ -17,6 +17,7 @@ import { sessionManager } from "@/lib/sessionManager";
 import { toast } from "@/hooks/use-toast";
 import { Permission } from "@/lib/rbac";
 import PermissionGuard from "@/components/PermissionGuard";
+import { RoleBasedNavigationMenu } from "@/components/navigation/RoleBasedNavigationMenu";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,13 +25,6 @@ const Header = () => {
   const location = useLocation();
   const { user, isAuthenticated, signOut } = useAuth();
   const { userProfile, hasPermission, getRoleDisplayName } = useRBAC();
-
-  const navigation = [
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "Upload", href: "/upload" },
-    { name: "Reports", href: "/reports" },
-    { name: "Billing", href: "/billing" },
-  ];
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -110,34 +104,12 @@ const Header = () => {
             <span className="text-xl font-bold text-gray-900">LinguaQA</span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === item.href
-                    ? "text-blue-600"
-                    : "text-gray-700 hover:text-blue-600"
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
-            <PermissionGuard permission={Permission.VIEW_USERS}>
-              <Link
-                to="/admin/users"
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === "/admin/users"
-                    ? "text-blue-600"
-                    : "text-gray-700 hover:text-blue-600"
-                }`}
-              >
-                User Management
-              </Link>
-            </PermissionGuard>
-          </nav>
+          {/* Desktop Navigation - Now using RoleBasedNavigationMenu */}
+          {isAuthenticated && (
+            <div className="hidden md:block">
+              <RoleBasedNavigationMenu />
+            </div>
+          )}
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
@@ -222,41 +194,26 @@ const Header = () => {
             )}
 
             {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+              >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
+        {/* Mobile Navigation - Now using RoleBasedNavigationMenu */}
+        {isMenuOpen && isAuthenticated && (
           <div className="md:hidden py-4 border-t">
-            <div className="space-y-2">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <PermissionGuard permission={Permission.VIEW_USERS}>
-                <Link
-                  to="/admin/users"
-                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  User Management
-                </Link>
-              </PermissionGuard>
-            </div>
+            <RoleBasedNavigationMenu 
+              isMobile={true}
+              className="space-y-2"
+            />
           </div>
         )}
       </div>

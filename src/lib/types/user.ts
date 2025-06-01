@@ -36,37 +36,86 @@ export enum Permission {
   // User management
   MANAGE_USERS = 'manage_users',
   VIEW_USERS = 'view_users',
+  CREATE_USERS = 'create_users',
+  UPDATE_USERS = 'update_users',
   DELETE_USERS = 'delete_users',
   
   // Role management
   MANAGE_ROLES = 'manage_roles',
   ASSIGN_ROLES = 'assign_roles',
+  VIEW_ROLES = 'view_roles',
+  
+  // Organization management
+  MANAGE_ORGANIZATIONS = 'manage_organizations',
+  VIEW_ORGANIZATIONS = 'view_organizations',
+  CREATE_ORGANIZATIONS = 'create_organizations',
+  UPDATE_ORGANIZATIONS = 'update_organizations',
+  DELETE_ORGANIZATIONS = 'delete_organizations',
+  VIEW_ALL_ORGANIZATIONS = 'view_all_organizations',
+  
+  // Project management
+  MANAGE_PROJECTS = 'manage_projects',
+  VIEW_PROJECTS = 'view_projects',
+  CREATE_PROJECTS = 'create_projects',
+  UPDATE_PROJECTS = 'update_projects',
+  DELETE_PROJECTS = 'delete_projects',
+  VIEW_ALL_PROJECTS = 'view_all_projects',
+  DELETE_ANY_PROJECT = 'delete_any_project',
+  
+  // Project member management
+  MANAGE_PROJECT_MEMBERS = 'manage_project_members',
+  ADD_PROJECT_MEMBERS = 'add_project_members',
+  REMOVE_PROJECT_MEMBERS = 'remove_project_members',
+  UPDATE_PROJECT_MEMBERS = 'update_project_members',
   
   // QA Sessions
   CREATE_QA_SESSION = 'create_qa_session',
   VIEW_QA_SESSION = 'view_qa_session',
+  UPDATE_QA_SESSION = 'update_qa_session',
   VIEW_ALL_QA_SESSIONS = 'view_all_qa_sessions',
   DELETE_QA_SESSION = 'delete_qa_session',
   DELETE_ANY_QA_SESSION = 'delete_any_qa_session',
   
   // File management
   UPLOAD_FILES = 'upload_files',
+  VIEW_FILES = 'view_files',
+  UPDATE_FILES = 'update_files',
   DELETE_FILES = 'delete_files',
   DELETE_ANY_FILES = 'delete_any_files',
+  VIEW_ALL_FILES = 'view_all_files',
   
   // Reports and analytics
   VIEW_REPORTS = 'view_reports',
+  CREATE_REPORTS = 'create_reports',
+  UPDATE_REPORTS = 'update_reports',
+  DELETE_REPORTS = 'delete_reports',
   VIEW_ALL_REPORTS = 'view_all_reports',
   EXPORT_REPORTS = 'export_reports',
+  
+  // User preferences
+  MANAGE_USER_PREFERENCES = 'manage_user_preferences',
+  UPDATE_USER_PREFERENCES = 'update_user_preferences',
+  VIEW_USER_PREFERENCES = 'view_user_preferences',
   
   // System administration
   VIEW_SYSTEM_LOGS = 'view_system_logs',
   MANAGE_SYSTEM_CONFIG = 'manage_system_config',
+  VIEW_AUDIT_LOGS = 'view_audit_logs',
+  EXPORT_AUDIT_LOGS = 'export_audit_logs',
   
   // Billing and subscription
   VIEW_BILLING = 'view_billing',
   MANAGE_BILLING = 'manage_billing',
-  VIEW_ALL_BILLING = 'view_all_billing'
+  VIEW_ALL_BILLING = 'view_all_billing',
+  UPDATE_BILLING = 'update_billing',
+  
+  // API access control
+  ACCESS_API = 'access_api',
+  MANAGE_API_KEYS = 'manage_api_keys',
+  
+  // Security permissions
+  MANAGE_SECURITY_SETTINGS = 'manage_security_settings',
+  VIEW_SECURITY_LOGS = 'view_security_logs'
 }
 
 // Core user profile interface

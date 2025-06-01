@@ -18,9 +18,12 @@ import UserManagement from "./pages/UserManagement";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import SecurityAdmin from '@/pages/SecurityAdmin';
 import FeedbackDemo from './pages/FeedbackDemo';
 import QAErrors from './pages/QAErrors';
+import PermissionDemo from './components/demo/PermissionDemo';
+import { UserRole, Permission } from '@/lib/rbac';
 
 const queryClient = new QueryClient();
 
@@ -33,45 +36,60 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           
-          {/* Protected Routes */}
+          {/* Protected Routes - Basic Authentication Required */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           } />
           <Route path="/upload" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute requiredPermission={Permission.UPLOAD_FILES}>
               <Upload />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/reports" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_REPORTS}>
               <Reports />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/report/:reportId" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_REPORTS}>
               <DetailedReport />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/billing" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_BILLING}>
               <Billing />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
             </ProtectedRoute>
           } />
+          
+          {/* Admin Routes - Role-Based Access Control */}
           <Route path="/admin/users" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute 
+              requiredPermission={Permission.VIEW_USERS}
+              minRole={UserRole.MANAGER}
+            >
               <UserManagement />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/admin/security" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute 
+              requiredPermission={Permission.VIEW_SECURITY_LOGS}
+              minRole={UserRole.ADMIN}
+            >
               <SecurityAdmin />
+            </RoleProtectedRoute>
+          } />
+          
+          {/* Demo and Development Routes */}
+          <Route path="/demo/permissions" element={
+            <ProtectedRoute>
+              <PermissionDemo />
             </ProtectedRoute>
           } />
           
@@ -82,16 +100,16 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<EmailVerification />} />
           
-          {/* New Feedback and QA Routes */}
+          {/* Feedback and QA Routes */}
           <Route path="/feedback-demo" element={
             <ProtectedRoute>
               <FeedbackDemo />
             </ProtectedRoute>
           } />
           <Route path="/qa-errors" element={
-            <ProtectedRoute>
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_QA_SESSION}>
               <QAErrors />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

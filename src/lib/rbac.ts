@@ -13,69 +13,215 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   
   [UserRole.ADMIN]: [
+    // User management
     Permission.MANAGE_USERS,
     Permission.VIEW_USERS,
+    Permission.CREATE_USERS,
+    Permission.UPDATE_USERS,
+    Permission.DELETE_USERS,
+    
+    // Role management
+    Permission.MANAGE_ROLES,
     Permission.ASSIGN_ROLES,
-    Permission.VIEW_ALL_QA_SESSIONS,
-    Permission.DELETE_ANY_QA_SESSION,
-    Permission.DELETE_ANY_FILES,
-    Permission.VIEW_ALL_REPORTS,
-    Permission.EXPORT_REPORTS,
-    Permission.VIEW_SYSTEM_LOGS,
-    Permission.MANAGE_SYSTEM_CONFIG,
-    Permission.VIEW_ALL_BILLING,
-    Permission.MANAGE_BILLING,
-    // Include all regular user permissions
+    Permission.VIEW_ROLES,
+    
+    // Organization management
+    Permission.MANAGE_ORGANIZATIONS,
+    Permission.VIEW_ORGANIZATIONS,
+    Permission.UPDATE_ORGANIZATIONS,
+    Permission.VIEW_ALL_ORGANIZATIONS,
+    
+    // Project management
+    Permission.MANAGE_PROJECTS,
+    Permission.VIEW_PROJECTS,
+    Permission.CREATE_PROJECTS,
+    Permission.UPDATE_PROJECTS,
+    Permission.DELETE_PROJECTS,
+    Permission.VIEW_ALL_PROJECTS,
+    Permission.DELETE_ANY_PROJECT,
+    
+    // Project member management
+    Permission.MANAGE_PROJECT_MEMBERS,
+    Permission.ADD_PROJECT_MEMBERS,
+    Permission.REMOVE_PROJECT_MEMBERS,
+    Permission.UPDATE_PROJECT_MEMBERS,
+    
+    // QA Sessions - full access
     Permission.CREATE_QA_SESSION,
     Permission.VIEW_QA_SESSION,
+    Permission.UPDATE_QA_SESSION,
+    Permission.VIEW_ALL_QA_SESSIONS,
     Permission.DELETE_QA_SESSION,
+    Permission.DELETE_ANY_QA_SESSION,
+    
+    // File management - full access
     Permission.UPLOAD_FILES,
+    Permission.VIEW_FILES,
+    Permission.UPDATE_FILES,
     Permission.DELETE_FILES,
+    Permission.DELETE_ANY_FILES,
+    Permission.VIEW_ALL_FILES,
+    
+    // Reports and analytics - full access
     Permission.VIEW_REPORTS,
-    Permission.VIEW_BILLING
+    Permission.CREATE_REPORTS,
+    Permission.UPDATE_REPORTS,
+    Permission.DELETE_REPORTS,
+    Permission.VIEW_ALL_REPORTS,
+    Permission.EXPORT_REPORTS,
+    
+    // User preferences
+    Permission.MANAGE_USER_PREFERENCES,
+    Permission.UPDATE_USER_PREFERENCES,
+    Permission.VIEW_USER_PREFERENCES,
+    
+    // System administration
+    Permission.VIEW_SYSTEM_LOGS,
+    Permission.MANAGE_SYSTEM_CONFIG,
+    Permission.VIEW_AUDIT_LOGS,
+    Permission.EXPORT_AUDIT_LOGS,
+    
+    // Billing - full access
+    Permission.VIEW_BILLING,
+    Permission.MANAGE_BILLING,
+    Permission.UPDATE_BILLING,
+    Permission.VIEW_ALL_BILLING,
+    
+    // API access
+    Permission.ACCESS_API,
+    Permission.MANAGE_API_KEYS,
+    
+    // Security
+    Permission.MANAGE_SECURITY_SETTINGS,
+    Permission.VIEW_SECURITY_LOGS
   ],
   
   [UserRole.MANAGER]: [
+    // User management - limited
     Permission.VIEW_USERS,
-    Permission.VIEW_ALL_QA_SESSIONS,
-    Permission.VIEW_ALL_REPORTS,
-    Permission.EXPORT_REPORTS,
-    Permission.MANAGE_BILLING,
-    // Include standard user permissions
+    
+    // Organization - view only
+    Permission.VIEW_ORGANIZATIONS,
+    
+    // Project management - full for assigned projects
+    Permission.VIEW_PROJECTS,
+    Permission.CREATE_PROJECTS,
+    Permission.UPDATE_PROJECTS,
+    Permission.DELETE_PROJECTS,
+    Permission.VIEW_ALL_PROJECTS,
+    
+    // Project member management
+    Permission.MANAGE_PROJECT_MEMBERS,
+    Permission.ADD_PROJECT_MEMBERS,
+    Permission.REMOVE_PROJECT_MEMBERS,
+    Permission.UPDATE_PROJECT_MEMBERS,
+    
+    // QA Sessions - view all, manage own
     Permission.CREATE_QA_SESSION,
     Permission.VIEW_QA_SESSION,
+    Permission.UPDATE_QA_SESSION,
+    Permission.VIEW_ALL_QA_SESSIONS,
     Permission.DELETE_QA_SESSION,
+    
+    // File management - standard plus view all
     Permission.UPLOAD_FILES,
+    Permission.VIEW_FILES,
+    Permission.UPDATE_FILES,
     Permission.DELETE_FILES,
+    Permission.VIEW_ALL_FILES,
+    
+    // Reports - full access for oversight
     Permission.VIEW_REPORTS,
-    Permission.VIEW_BILLING
+    Permission.CREATE_REPORTS,
+    Permission.UPDATE_REPORTS,
+    Permission.VIEW_ALL_REPORTS,
+    Permission.EXPORT_REPORTS,
+    
+    // User preferences - own only
+    Permission.UPDATE_USER_PREFERENCES,
+    Permission.VIEW_USER_PREFERENCES,
+    
+    // Billing - view and manage
+    Permission.VIEW_BILLING,
+    Permission.MANAGE_BILLING,
+    Permission.UPDATE_BILLING,
+    Permission.VIEW_ALL_BILLING,
+    
+    // API access
+    Permission.ACCESS_API
   ],
   
   [UserRole.QA_ANALYST]: [
+    // QA Sessions - full access to own
     Permission.CREATE_QA_SESSION,
     Permission.VIEW_QA_SESSION,
+    Permission.UPDATE_QA_SESSION,
     Permission.DELETE_QA_SESSION,
+    
+    // File management - standard access
     Permission.UPLOAD_FILES,
+    Permission.VIEW_FILES,
+    Permission.UPDATE_FILES,
     Permission.DELETE_FILES,
+    
+    // Projects - view and update assigned projects
+    Permission.VIEW_PROJECTS,
+    Permission.UPDATE_PROJECTS,
+    
+    // Reports - create, view, export own
     Permission.VIEW_REPORTS,
+    Permission.CREATE_REPORTS,
+    Permission.UPDATE_REPORTS,
     Permission.EXPORT_REPORTS,
-    Permission.VIEW_BILLING
+    
+    // User preferences - own only
+    Permission.UPDATE_USER_PREFERENCES,
+    Permission.VIEW_USER_PREFERENCES,
+    
+    // Billing - view own
+    Permission.VIEW_BILLING,
+    
+    // API access
+    Permission.ACCESS_API
   ],
   
   [UserRole.USER]: [
+    // QA Sessions - basic access to own
     Permission.CREATE_QA_SESSION,
     Permission.VIEW_QA_SESSION,
+    Permission.UPDATE_QA_SESSION,
     Permission.DELETE_QA_SESSION,
+    
+    // File management - basic access to own
     Permission.UPLOAD_FILES,
+    Permission.VIEW_FILES,
+    Permission.UPDATE_FILES,
     Permission.DELETE_FILES,
+    
+    // Projects - view assigned projects
+    Permission.VIEW_PROJECTS,
+    
+    // Reports - view and export own
     Permission.VIEW_REPORTS,
-    Permission.VIEW_BILLING
+    Permission.EXPORT_REPORTS,
+    
+    // User preferences - own only
+    Permission.UPDATE_USER_PREFERENCES,
+    Permission.VIEW_USER_PREFERENCES,
+    
+    // Billing - view own
+    Permission.VIEW_BILLING,
+    
+    // API access - basic
+    Permission.ACCESS_API
   ],
   
   [UserRole.GUEST]: [
-    // Guests have very limited permissions
+    // Very limited permissions
     Permission.VIEW_QA_SESSION,
-    Permission.VIEW_REPORTS
+    Permission.VIEW_REPORTS,
+    Permission.VIEW_PROJECTS,
+    Permission.VIEW_USER_PREFERENCES
   ]
 };
 
@@ -251,11 +397,44 @@ class RBACService {
    */
   private getElevatedPermissions(basePermission: Permission): Permission[] {
     const permissionMap: Partial<Record<Permission, Permission[]>> = {
+      // QA Sessions
       [Permission.VIEW_QA_SESSION]: [Permission.VIEW_ALL_QA_SESSIONS],
+      [Permission.UPDATE_QA_SESSION]: [Permission.VIEW_ALL_QA_SESSIONS, Permission.MANAGE_PROJECTS],
       [Permission.DELETE_QA_SESSION]: [Permission.DELETE_ANY_QA_SESSION],
+      
+      // Files
+      [Permission.VIEW_FILES]: [Permission.VIEW_ALL_FILES],
+      [Permission.UPDATE_FILES]: [Permission.VIEW_ALL_FILES, Permission.MANAGE_PROJECTS],
       [Permission.DELETE_FILES]: [Permission.DELETE_ANY_FILES],
+      
+      // Reports
       [Permission.VIEW_REPORTS]: [Permission.VIEW_ALL_REPORTS],
-      [Permission.VIEW_BILLING]: [Permission.VIEW_ALL_BILLING],
+      [Permission.CREATE_REPORTS]: [Permission.VIEW_ALL_REPORTS, Permission.MANAGE_PROJECTS],
+      [Permission.UPDATE_REPORTS]: [Permission.VIEW_ALL_REPORTS, Permission.MANAGE_PROJECTS],
+      [Permission.DELETE_REPORTS]: [Permission.VIEW_ALL_REPORTS, Permission.MANAGE_PROJECTS],
+      
+      // Projects
+      [Permission.VIEW_PROJECTS]: [Permission.VIEW_ALL_PROJECTS, Permission.MANAGE_PROJECTS],
+      [Permission.UPDATE_PROJECTS]: [Permission.MANAGE_PROJECTS],
+      [Permission.DELETE_PROJECTS]: [Permission.DELETE_ANY_PROJECT, Permission.MANAGE_PROJECTS],
+      
+      // Users
+      [Permission.VIEW_USERS]: [Permission.MANAGE_USERS],
+      [Permission.UPDATE_USERS]: [Permission.MANAGE_USERS],
+      [Permission.DELETE_USERS]: [Permission.MANAGE_USERS],
+      
+      // Organizations
+      [Permission.VIEW_ORGANIZATIONS]: [Permission.VIEW_ALL_ORGANIZATIONS, Permission.MANAGE_ORGANIZATIONS],
+      [Permission.UPDATE_ORGANIZATIONS]: [Permission.MANAGE_ORGANIZATIONS],
+      [Permission.DELETE_ORGANIZATIONS]: [Permission.MANAGE_ORGANIZATIONS],
+      
+      // Billing
+      [Permission.VIEW_BILLING]: [Permission.VIEW_ALL_BILLING, Permission.MANAGE_BILLING],
+      [Permission.UPDATE_BILLING]: [Permission.MANAGE_BILLING],
+      
+      // User Preferences
+      [Permission.VIEW_USER_PREFERENCES]: [Permission.MANAGE_USER_PREFERENCES],
+      [Permission.UPDATE_USER_PREFERENCES]: [Permission.MANAGE_USER_PREFERENCES],
     };
 
     return permissionMap[basePermission] || [];
@@ -476,10 +655,336 @@ class RBACService {
       .filter(([_, level]) => level < adminLevel)
       .map(([role, _]) => role as UserRole);
   }
+
+  /**
+   * Check if user has permission for a specific resource within a project context
+   */
+  async hasProjectPermission(
+    userId: string, 
+    projectId: string, 
+    permission: Permission
+  ): Promise<boolean> {
+    // First check if user has the basic permission
+    const hasBasicPermission = await this.hasPermission(userId, permission);
+    if (!hasBasicPermission) {
+      return false;
+    }
+
+    // For project-specific resources, check if user has access to the project
+    const projectPermissions = [
+      Permission.VIEW_PROJECTS,
+      Permission.UPDATE_PROJECTS,
+      Permission.DELETE_PROJECTS,
+      Permission.MANAGE_PROJECT_MEMBERS,
+      Permission.ADD_PROJECT_MEMBERS,
+      Permission.REMOVE_PROJECT_MEMBERS,
+      Permission.UPDATE_PROJECT_MEMBERS
+    ];
+
+    if (projectPermissions.includes(permission)) {
+      // Check if user is a project member or has elevated access
+      return await this.isProjectMember(userId, projectId) || 
+             await this.hasAnyPermission(userId, [
+               Permission.VIEW_ALL_PROJECTS, 
+               Permission.MANAGE_PROJECTS
+             ]);
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if user has permission for a specific resource within an organization context
+   */
+  async hasOrganizationPermission(
+    userId: string, 
+    organizationId: string, 
+    permission: Permission
+  ): Promise<boolean> {
+    // First check if user has the basic permission
+    const hasBasicPermission = await this.hasPermission(userId, permission);
+    if (!hasBasicPermission) {
+      return false;
+    }
+
+    // Check if user belongs to the organization
+    const userProfile = await this.getUserProfile(userId);
+    if (userProfile?.organization_id === organizationId) {
+      return true;
+    }
+
+    // Check if user has elevated organization permissions
+    return await this.hasAnyPermission(userId, [
+      Permission.VIEW_ALL_ORGANIZATIONS,
+      Permission.MANAGE_ORGANIZATIONS
+    ]);
+  }
+
+  /**
+   * Check if user is a member of a specific project
+   */
+  private async isProjectMember(userId: string, projectId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('project_id', projectId)
+        .eq('status', 'active')
+        .single();
+
+      return !error && !!data;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get user's effective permissions for a specific resource context
+   */
+  async getContextualPermissions(
+    userId: string, 
+    context: {
+      type: 'project' | 'organization' | 'global';
+      resourceId?: string;
+    }
+  ): Promise<Permission[]> {
+    const basePermissions = await this.getUserPermissions(userId);
+    
+    if (context.type === 'global' || !context.resourceId) {
+      return basePermissions;
+    }
+
+    // Filter permissions based on context
+    const contextualPermissions: Permission[] = [];
+    
+    for (const permission of basePermissions) {
+      let hasContextualAccess = false;
+      
+      if (context.type === 'project') {
+        hasContextualAccess = await this.hasProjectPermission(userId, context.resourceId, permission);
+      } else if (context.type === 'organization') {
+        hasContextualAccess = await this.hasOrganizationPermission(userId, context.resourceId, permission);
+      }
+      
+      if (hasContextualAccess) {
+        contextualPermissions.push(permission);
+      }
+    }
+    
+    return contextualPermissions;
+  }
+
+  /**
+   * Check resource ownership and permission inheritance
+   */
+  async canModifyResource(
+    userId: string,
+    resourceType: 'qa_session' | 'file' | 'project' | 'report',
+    resourceId: string,
+    action: 'view' | 'update' | 'delete'
+  ): Promise<boolean> {
+    // Define permission mappings for each resource type and action
+    const permissionMap: Record<string, Record<string, Permission[]>> = {
+      qa_session: {
+        view: [Permission.VIEW_QA_SESSION, Permission.VIEW_ALL_QA_SESSIONS],
+        update: [Permission.UPDATE_QA_SESSION, Permission.VIEW_ALL_QA_SESSIONS],
+        delete: [Permission.DELETE_QA_SESSION, Permission.DELETE_ANY_QA_SESSION]
+      },
+      file: {
+        view: [Permission.VIEW_FILES, Permission.VIEW_ALL_FILES],
+        update: [Permission.UPDATE_FILES, Permission.VIEW_ALL_FILES],
+        delete: [Permission.DELETE_FILES, Permission.DELETE_ANY_FILES]
+      },
+      project: {
+        view: [Permission.VIEW_PROJECTS, Permission.VIEW_ALL_PROJECTS],
+        update: [Permission.UPDATE_PROJECTS, Permission.MANAGE_PROJECTS],
+        delete: [Permission.DELETE_PROJECTS, Permission.DELETE_ANY_PROJECT]
+      },
+      report: {
+        view: [Permission.VIEW_REPORTS, Permission.VIEW_ALL_REPORTS],
+        update: [Permission.UPDATE_REPORTS, Permission.VIEW_ALL_REPORTS],
+        delete: [Permission.DELETE_REPORTS, Permission.VIEW_ALL_REPORTS]
+      }
+    };
+
+    const requiredPermissions = permissionMap[resourceType]?.[action];
+    if (!requiredPermissions) {
+      return false;
+    }
+
+    // Check if user has any of the required permissions
+    return await this.hasAnyPermission(userId, requiredPermissions);
+  }
+
+  /**
+   * Validate permission hierarchy and resolve conflicts
+   */
+  async resolvePermissionConflicts(
+    userId: string,
+    requestedPermissions: Permission[]
+  ): Promise<{
+    granted: Permission[];
+    denied: Permission[];
+    conflicts: Array<{ permission: Permission; reason: string }>;
+  }> {
+    const userPermissions = await this.getUserPermissions(userId);
+    const granted: Permission[] = [];
+    const denied: Permission[] = [];
+    const conflicts: Array<{ permission: Permission; reason: string }> = [];
+
+    for (const permission of requestedPermissions) {
+      if (userPermissions.includes(permission)) {
+        granted.push(permission);
+      } else {
+        // Check for elevated permissions
+        const elevatedPermissions = this.getElevatedPermissions(permission);
+        const hasElevated = elevatedPermissions.some(ep => userPermissions.includes(ep));
+        
+        if (hasElevated) {
+          granted.push(permission);
+        } else {
+          denied.push(permission);
+          conflicts.push({
+            permission,
+            reason: `Insufficient permissions. Required: ${permission}, User role: ${await this.getUserRole(userId)}`
+          });
+        }
+      }
+    }
+
+    return { granted, denied, conflicts };
+  }
 }
 
 // Create and export singleton instance
 export const rbacService = new RBACService();
+
+// Permission matrix for better understanding of resource-action-permission relationships
+export const PERMISSION_MATRIX = {
+  // User management
+  users: {
+    create: [Permission.CREATE_USERS, Permission.MANAGE_USERS],
+    read: [Permission.VIEW_USERS, Permission.MANAGE_USERS],
+    update: [Permission.UPDATE_USERS, Permission.MANAGE_USERS], 
+    delete: [Permission.DELETE_USERS, Permission.MANAGE_USERS],
+    manage: [Permission.MANAGE_USERS]
+  },
+  
+  // Organization management
+  organizations: {
+    create: [Permission.CREATE_ORGANIZATIONS, Permission.MANAGE_ORGANIZATIONS],
+    read: [Permission.VIEW_ORGANIZATIONS, Permission.VIEW_ALL_ORGANIZATIONS, Permission.MANAGE_ORGANIZATIONS],
+    update: [Permission.UPDATE_ORGANIZATIONS, Permission.MANAGE_ORGANIZATIONS],
+    delete: [Permission.DELETE_ORGANIZATIONS, Permission.MANAGE_ORGANIZATIONS],
+    manage: [Permission.MANAGE_ORGANIZATIONS]
+  },
+  
+  // Project management
+  projects: {
+    create: [Permission.CREATE_PROJECTS, Permission.MANAGE_PROJECTS],
+    read: [Permission.VIEW_PROJECTS, Permission.VIEW_ALL_PROJECTS, Permission.MANAGE_PROJECTS],
+    update: [Permission.UPDATE_PROJECTS, Permission.MANAGE_PROJECTS],
+    delete: [Permission.DELETE_PROJECTS, Permission.DELETE_ANY_PROJECT, Permission.MANAGE_PROJECTS],
+    manage: [Permission.MANAGE_PROJECTS],
+    managemembers: [Permission.MANAGE_PROJECT_MEMBERS, Permission.MANAGE_PROJECTS]
+  },
+  
+  // QA Session management
+  qa_sessions: {
+    create: [Permission.CREATE_QA_SESSION],
+    read: [Permission.VIEW_QA_SESSION, Permission.VIEW_ALL_QA_SESSIONS],
+    update: [Permission.UPDATE_QA_SESSION, Permission.VIEW_ALL_QA_SESSIONS],
+    delete: [Permission.DELETE_QA_SESSION, Permission.DELETE_ANY_QA_SESSION]
+  },
+  
+  // File management
+  files: {
+    create: [Permission.UPLOAD_FILES],
+    read: [Permission.VIEW_FILES, Permission.VIEW_ALL_FILES],
+    update: [Permission.UPDATE_FILES, Permission.VIEW_ALL_FILES],
+    delete: [Permission.DELETE_FILES, Permission.DELETE_ANY_FILES]
+  },
+  
+  // Report management
+  reports: {
+    create: [Permission.CREATE_REPORTS],
+    read: [Permission.VIEW_REPORTS, Permission.VIEW_ALL_REPORTS],
+    update: [Permission.UPDATE_REPORTS, Permission.VIEW_ALL_REPORTS],
+    delete: [Permission.DELETE_REPORTS, Permission.VIEW_ALL_REPORTS],
+    export: [Permission.EXPORT_REPORTS]
+  },
+  
+  // Role management
+  roles: {
+    read: [Permission.VIEW_ROLES, Permission.MANAGE_ROLES],
+    assign: [Permission.ASSIGN_ROLES, Permission.MANAGE_ROLES],
+    manage: [Permission.MANAGE_ROLES]
+  },
+  
+  // Billing management
+  billing: {
+    read: [Permission.VIEW_BILLING, Permission.VIEW_ALL_BILLING, Permission.MANAGE_BILLING],
+    update: [Permission.UPDATE_BILLING, Permission.MANAGE_BILLING],
+    manage: [Permission.MANAGE_BILLING]
+  },
+  
+  // System administration
+  system: {
+    logs: [Permission.VIEW_SYSTEM_LOGS, Permission.VIEW_AUDIT_LOGS],
+    config: [Permission.MANAGE_SYSTEM_CONFIG],
+    security: [Permission.MANAGE_SECURITY_SETTINGS, Permission.VIEW_SECURITY_LOGS]
+  },
+  
+  // API access
+  api: {
+    access: [Permission.ACCESS_API],
+    manage: [Permission.MANAGE_API_KEYS]
+  }
+} as const;
+
+// Resource ownership patterns for determining who owns what
+export const RESOURCE_OWNERSHIP = {
+  qa_sessions: {
+    ownerField: 'user_id',
+    table: 'qa_sessions',
+    projectField: 'project_id'
+  },
+  files: {
+    ownerField: 'user_id', 
+    table: 'file_uploads',
+    sessionField: 'session_id'
+  },
+  projects: {
+    ownerField: 'created_by',
+    table: 'projects',
+    organizationField: 'organization_id'
+  },
+  reports: {
+    ownerField: 'created_by',
+    table: 'reports',
+    projectField: 'project_id'
+  }
+} as const;
+
+// Helper function to get required permissions for resource action
+export function getRequiredPermissions(
+  resource: keyof typeof PERMISSION_MATRIX,
+  action: string
+): Permission[] {
+  const resourcePermissions = PERMISSION_MATRIX[resource] as any;
+  return resourcePermissions[action] ? [...resourcePermissions[action]] : [];
+}
+
+// Helper function to check if a permission grants access to a resource action
+export function hasRequiredPermission(
+  userPermissions: Permission[],
+  resource: keyof typeof PERMISSION_MATRIX,
+  action: string
+): boolean {
+  const requiredPermissions = getRequiredPermissions(resource, action);
+  return requiredPermissions.some(permission => userPermissions.includes(permission));
+}
 
 // Export types and enums
 export type { UserProfile };

@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { rbacService, UserRole, Permission, type UserProfile } from '@/lib/rbac';
+import { 
+  rbacService, 
+  UserRole, 
+  Permission, 
+  type UserProfile,
+  PERMISSION_MATRIX,
+  hasRequiredPermission,
+  getRequiredPermissions
+} from '@/lib/rbac';
 
 interface RBACState {
   userProfile: UserProfile | null;
@@ -22,6 +30,17 @@ interface RBACHookReturn extends RBACState {
   getAssignableRoles: () => Promise<UserRole[]>;
   refreshUserProfile: () => Promise<void>;
   clearCache: () => void;
+  
+  // Enhanced permission methods
+  hasProjectPermission: (projectId: string, permission: Permission) => Promise<boolean>;
+  hasOrganizationPermission: (organizationId: string, permission: Permission) => Promise<boolean>;
+  getContextualPermissions: (context: { type: 'project' | 'organization' | 'global'; resourceId?: string }) => Promise<Permission[]>;
+  canModifyResource: (resourceType: 'qa_session' | 'file' | 'project' | 'report', resourceId: string, action: 'view' | 'update' | 'delete') => Promise<boolean>;
+  resolvePermissionConflicts: (requestedPermissions: Permission[]) => Promise<{ granted: Permission[]; denied: Permission[]; conflicts: Array<{ permission: Permission; reason: string }> }>;
+  
+  // Permission matrix helpers
+  hasResourcePermission: (resource: keyof typeof PERMISSION_MATRIX, action: string) => boolean;
+  getRequiredPermissionsForAction: (resource: keyof typeof PERMISSION_MATRIX, action: string) => Permission[];
 }
 
 export const useRBAC = (): RBACHookReturn => {
@@ -142,6 +161,41 @@ export const useRBAC = (): RBACHookReturn => {
     rbacService.clearUserCache();
   }, []);
 
+  // Enhanced permission methods
+  const hasProjectPermission = useCallback(async (projectId: string, permission: Permission): Promise<boolean> => {
+    if (!user?.id) return false;
+    return await rbacService.hasProjectPermission(user.id, projectId, permission);
+  }, [user?.id]);
+
+  const hasOrganizationPermission = useCallback(async (organizationId: string, permission: Permission): Promise<boolean> => {
+    if (!user?.id) return false;
+    return await rbacService.hasOrganizationPermission(user.id, organizationId, permission);
+  }, [user?.id]);
+
+  const getContextualPermissions = useCallback(async (context: { type: 'project' | 'organization' | 'global'; resourceId?: string }): Promise<Permission[]> => {
+    if (!user?.id) return [];
+    return await rbacService.getContextualPermissions(user.id, context);
+  }, [user?.id]);
+
+  const canModifyResource = useCallback(async (resourceType: 'qa_session' | 'file' | 'project' | 'report', resourceId: string, action: 'view' | 'update' | 'delete'): Promise<boolean> => {
+    if (!user?.id) return false;
+    return await rbacService.canModifyResource(user.id, resourceType, resourceId, action);
+  }, [user?.id]);
+
+  const resolvePermissionConflicts = useCallback(async (requestedPermissions: Permission[]): Promise<{ granted: Permission[]; denied: Permission[]; conflicts: Array<{ permission: Permission; reason: string }> }> => {
+    if (!user?.id) return { granted: [], denied: [], conflicts: [] };
+    return await rbacService.resolvePermissionConflicts(user.id, requestedPermissions);
+  }, [user?.id]);
+
+  // Permission matrix helpers
+  const hasResourcePermission = useCallback((resource: keyof typeof PERMISSION_MATRIX, action: string): boolean => {
+    return hasRequiredPermission(state.permissions, resource, action);
+  }, [state.permissions]);
+
+  const getRequiredPermissionsForAction = useCallback((resource: keyof typeof PERMISSION_MATRIX, action: string): Permission[] => {
+    return getRequiredPermissions(resource, action);
+  }, []);
+
   return {
     ...state,
     hasPermission,
@@ -154,6 +208,13 @@ export const useRBAC = (): RBACHookReturn => {
     getRoleDisplayName,
     getAssignableRoles,
     refreshUserProfile,
-    clearCache
+    clearCache,
+    hasProjectPermission,
+    hasOrganizationPermission,
+    getContextualPermissions,
+    canModifyResource,
+    resolvePermissionConflicts,
+    hasResourcePermission,
+    getRequiredPermissionsForAction
   };
 }; 

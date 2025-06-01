@@ -56,6 +56,85 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_by UUID REFERENCES public.profiles(id)
 );
 
+-- Create audit_logs table for comprehensive role-based access logging
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    
+    -- Event identification
+    event_type TEXT NOT NULL CHECK (event_type IN (
+        'PERMISSION_CHECK', 
+        'ROLE_ASSIGNED', 
+        'ROLE_REMOVED', 
+        'ACCESS_GRANTED', 
+        'ACCESS_DENIED',
+        'ROLE_UPDATED',
+        'PERMISSION_GRANTED',
+        'PERMISSION_DENIED',
+        'RESOURCE_ACCESS',
+        'SECURITY_VIOLATION',
+        'PRIVILEGE_ESCALATION',
+        'SUSPICIOUS_ACTIVITY'
+    )),
+    
+    -- Core audit information
+    user_id UUID REFERENCES public.profiles(id),
+    affected_user_id UUID REFERENCES public.profiles(id), -- For role assignments affecting others
+    actor_email TEXT, -- Email for identification even if user deleted
+    affected_email TEXT,
+    
+    -- Permission and role context
+    permission_checked TEXT, -- Permission being checked
+    role_from TEXT, -- Previous role (for role changes)
+    role_to TEXT, -- New role (for role changes)
+    current_user_role TEXT, -- Actor's role at time of action
+    
+    -- Resource context
+    resource_type TEXT, -- Type of resource accessed
+    resource_id TEXT, -- ID of specific resource
+    resource_name TEXT, -- Human-readable resource name
+    organization_id UUID REFERENCES public.organizations(id),
+    project_id UUID REFERENCES public.projects(id),
+    
+    -- Request details
+    request_path TEXT, -- API endpoint or page accessed
+    request_method TEXT, -- HTTP method (GET, POST, etc.)
+    request_body JSONB, -- Sanitized request data
+    
+    -- Result and metadata
+    result TEXT NOT NULL CHECK (result IN ('granted', 'denied', 'error', 'warning')),
+    reason TEXT, -- Explanation for the result
+    
+    -- Session and security context
+    session_id TEXT,
+    ip_address INET,
+    user_agent TEXT,
+    device_fingerprint TEXT,
+    
+    -- Geographic and temporal context
+    geo_location JSONB, -- City, country, timezone
+    
+    -- Detailed event metadata
+    metadata JSONB DEFAULT '{}', -- Additional event-specific data
+    
+    -- Risk assessment
+    risk_level TEXT DEFAULT 'low' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+    confidence_score INTEGER DEFAULT 100 CHECK (confidence_score >= 0 AND confidence_score <= 100),
+    
+    -- Audit trail
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE, -- For retention policy
+    
+    -- Compliance flags
+    requires_review BOOLEAN DEFAULT FALSE,
+    reviewed_by UUID REFERENCES public.profiles(id),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    review_notes TEXT,
+    
+    -- Data retention
+    archived BOOLEAN DEFAULT FALSE,
+    archived_at TIMESTAMP WITH TIME ZONE
+);
+
 -- Create organizations table
 CREATE TABLE IF NOT EXISTS public.organizations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -1023,6 +1102,9 @@ ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback_learning ENABLE ROW LEVEL SECURITY;
 
+-- Enable RLS on audit logs table
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
 -- User Feedback: Users can view and create their own feedback, admins can view all
 CREATE POLICY "Users can view own feedback" ON public.user_feedback
     FOR SELECT USING (
@@ -1230,4 +1312,57 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Create trigger for new user signup
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user(); 
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Audit logs indexes for security monitoring and compliance
+CREATE INDEX IF NOT EXISTS idx_audit_logs_event_type ON public.audit_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_affected_user_id ON public.audit_logs(affected_user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_email ON public.audit_logs(actor_email);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_result ON public.audit_logs(result);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_risk_level ON public.audit_logs(risk_level);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_organization_id ON public.audit_logs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_project_id ON public.audit_logs(project_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_session_id ON public.audit_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_ip_address ON public.audit_logs(ip_address);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_requires_review ON public.audit_logs(requires_review);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_archived ON public.audit_logs(archived);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_expires_at ON public.audit_logs(expires_at);
+
+-- Composite indexes for common audit queries
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_event_time 
+    ON public.audit_logs(user_id, event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_org_event_time 
+    ON public.audit_logs(organization_id, event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_risk_review 
+    ON public.audit_logs(risk_level, requires_review, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_permission_result 
+    ON public.audit_logs(permission_checked, result, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource_access 
+    ON public.audit_logs(resource_type, resource_id, result, created_at DESC);
+
+-- GIN index for metadata queries
+CREATE INDEX IF NOT EXISTS idx_audit_logs_metadata_gin 
+    ON public.audit_logs USING gin (metadata);
+
+-- Partial indexes for performance on filtered queries
+CREATE INDEX IF NOT EXISTS idx_audit_logs_failed_attempts 
+    ON public.audit_logs(user_id, created_at DESC) 
+    WHERE result = 'denied';
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_suspicious_activity 
+    ON public.audit_logs(ip_address, user_agent, created_at DESC) 
+    WHERE event_type = 'SUSPICIOUS_ACTIVITY';
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_role_changes 
+    ON public.audit_logs(affected_user_id, role_from, role_to, created_at DESC) 
+    WHERE event_type IN ('ROLE_ASSIGNED', 'ROLE_REMOVED', 'ROLE_UPDATED');
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_active_records 
+    ON public.audit_logs(created_at DESC) 
+    WHERE archived = FALSE; 
