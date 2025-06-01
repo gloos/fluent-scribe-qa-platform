@@ -38,12 +38,21 @@ import {
   IssueAnalysisChart, 
   ProcessingEfficiencyChart 
 } from "@/components/charts";
+// Enhanced reporting components
+import { EnhancedTaxonomyChart } from "@/components/reports/EnhancedTaxonomyChart";
+import { SeverityImpactChart } from "@/components/reports/SeverityImpactChart";
+import { TrendAnalysisChart } from "@/components/reports/TrendAnalysisChart";
+import { AutomatedRecommendationsPanel } from "@/components/reports/AutomatedRecommendationsPanel";
 import { useReportFilters, type ReportData } from "@/hooks/useReportFilters";
 import { AdvancedFilters } from "@/components/filters/AdvancedFilters";
 import { TrendIndicator } from "@/components/ui/trend-indicator";
 import { DashboardPreferencesModal } from "@/components/dashboard/DashboardPreferences";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { FeedbackTargetType, FeedbackFormData } from "@/lib/types/user-feedback";
+// Enhanced taxonomy types and mock data
+import { MQMDimension, MQMSeverity, type MQMErrorInstance } from "@/lib/types/assessment";
+import { ExpandedErrorCategory, ErrorDomain, CategoryLevel } from "@/lib/types/mqm-taxonomy-expansion";
+import { MQMAccuracyCategory, MQLinguisticConventionsCategory, MQMTerminologyCategory, MQMAudienceAppropriatenessCategory, ErrorStatus } from "@/lib/types/assessment";
 
 interface RecentFile {
   id: string;
@@ -68,6 +77,127 @@ const Dashboard = () => {
     summaryStats,
     isFiltering
   } = useReportFilters();
+
+  // Mock data for enhanced reporting components
+  const mockEnhancedErrors: MQMErrorInstance[] = [
+    {
+      id: "1",
+      category: MQMAccuracyCategory.MISTRANSLATION,
+      dimension: MQMDimension.ACCURACY,
+      severity: MQMSeverity.CRITICAL,
+      description: "Incorrect medical term translation",
+      penalty: 25,
+      timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      segment_id: "seg-1",
+      start_position: 45,
+      end_position: 58,
+      source_text: "cardiac arrest",
+      target_text: "heart attack",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    },
+    {
+      id: "2", 
+      category: MQLinguisticConventionsCategory.GRAMMAR,
+      dimension: MQMDimension.LINGUISTIC_CONVENTIONS,
+      severity: MQMSeverity.MAJOR,
+      description: "Incorrect verb conjugation",
+      penalty: 15,
+      timestamp: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+      segment_id: "seg-2",
+      start_position: 120,
+      end_position: 138,
+      source_text: "They have completed",
+      target_text: "They has completed",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    },
+    {
+      id: "3",
+      category: MQMTerminologyCategory.INCONSISTENT_USE,
+      dimension: MQMDimension.TERMINOLOGY,
+      severity: MQMSeverity.MAJOR,
+      description: "Inconsistent technical term usage",
+      penalty: 12,
+      timestamp: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+      segment_id: "seg-3",
+      start_position: 200,
+      end_position: 220,
+      source_text: "software application",
+      target_text: "app",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    },
+    {
+      id: "4",
+      category: MQMAudienceAppropriatenessCategory.INAPPROPRIATE_REGISTER,
+      dimension: MQMDimension.AUDIENCE_APPROPRIATENESS,
+      severity: MQMSeverity.MINOR,
+      description: "Inappropriate formality level",
+      penalty: 5,
+      timestamp: new Date(Date.now() - 345600000).toISOString(), // 4 days ago
+      segment_id: "seg-4",
+      start_position: 300,
+      end_position: 315,
+      source_text: "We recommend",
+      target_text: "We suggest ya",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    },
+    {
+      id: "5",
+      category: MQMAccuracyCategory.OMISSION,
+      dimension: MQMDimension.ACCURACY,
+      severity: MQMSeverity.MAJOR,
+      description: "Missing crucial information",
+      penalty: 18,
+      timestamp: new Date(Date.now() - 432000000).toISOString(), // 5 days ago
+      segment_id: "seg-5",
+      start_position: 400,
+      end_position: 445,
+      source_text: "Please contact emergency services immediately",
+      target_text: "Please contact services",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    },
+    {
+      id: "6",
+      category: MQLinguisticConventionsCategory.PUNCTUATION,
+      dimension: MQMDimension.LINGUISTIC_CONVENTIONS,
+      severity: MQMSeverity.MINOR,
+      description: "Missing comma in compound sentence",
+      penalty: 3,
+      timestamp: new Date(Date.now() - 518400000).toISOString(), // 6 days ago
+      segment_id: "seg-6",
+      start_position: 500,
+      end_position: 540,
+      source_text: "Although it was late, we continued working",
+      target_text: "Although it was late we continued working",
+      assessor_id: "assessor-1",
+      status: ErrorStatus.OPEN
+    }
+  ];
+
+  const mockExpandedCategories: ExpandedErrorCategory[] = [
+    {
+      id: "accuracy-mistranslation",
+      level: CategoryLevel.CATEGORY,
+      name: "Mistranslation",
+      description: "Incorrect meaning transfer between languages",
+      dimension: MQMDimension.ACCURACY,
+      domain_specific: true,
+      applicable_domains: [ErrorDomain.MEDICAL, ErrorDomain.TECHNICAL]
+    },
+    {
+      id: "terminology-inconsistent",
+      level: CategoryLevel.CATEGORY,
+      name: "Inconsistent Terminology",
+      description: "Use of different terms for the same concept",
+      dimension: MQMDimension.TERMINOLOGY,
+      domain_specific: true,
+      applicable_domains: [ErrorDomain.TECHNICAL, ErrorDomain.FINANCIAL]
+    }
+  ];
 
   const getStatusIcon = (status: RecentFile["status"]) => {
     switch (status) {
@@ -756,39 +886,33 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <Card>
-              <CardHeader>
-                <CardTitle>Detailed Analytics</CardTitle>
-                <CardDescription>
-                  Deep dive into your quality assessment metrics and trends
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium mb-2">Advanced Analytics Dashboard</p>
-                  <p className="text-sm">Detailed visualizations will be implemented in upcoming subtasks</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Enhanced Taxonomy Analysis */}
+              <EnhancedTaxonomyChart 
+                errors={mockEnhancedErrors}
+                expandedCategories={mockExpandedCategories}
+              />
+              
+              {/* Severity Impact Analysis */}
+              <SeverityImpactChart 
+                errors={mockEnhancedErrors}
+              />
+              
+              {/* Automated Recommendations */}
+              <AutomatedRecommendationsPanel 
+                errors={mockEnhancedErrors}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="trends">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quality Trends</CardTitle>
-                <CardDescription>
-                  Historical quality metrics and improvement patterns
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <TrendingUp className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium mb-2">Quality Trend Analysis</p>
-                  <p className="text-sm">Time-series visualizations coming soon</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Trend Analysis */}
+              <TrendAnalysisChart 
+                errors={mockEnhancedErrors}
+                timeRange="30d"
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="reports">

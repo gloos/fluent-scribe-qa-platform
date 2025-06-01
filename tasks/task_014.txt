@@ -11,7 +11,7 @@
 
 
 # Subtasks:
-## 1. Filter Implementation [pending]
+## 1. Filter Implementation [in-progress]
 ### Dependencies: None
 ### Description: Develop comprehensive filtering capabilities for the interactive reporting system
 ### Details:
