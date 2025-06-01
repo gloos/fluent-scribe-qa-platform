@@ -18,12 +18,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Filter, Download, Eye, FileText, RefreshCw, Trash2, Brain } from "lucide-react";
+import { Search, Filter, Download, Eye, FileText, RefreshCw, Trash2, Brain, Settings, BarChart3, Grid3X3, User } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { QASession } from "@/lib/types/qa-session";
 import { toast } from "@/hooks/use-toast";
+import { useReportFilters, type ReportData } from "@/hooks/useReportFilters";
+import { AdvancedFilters } from "@/components/filters/AdvancedFilters";
+import { ReportsVisualizationDashboard, type ViewMode } from "@/components/reports/ReportsVisualizationDashboard";
+import { useDrillDown, type DrillDownLevel } from "@/hooks/useDrillDown";
+import { DrillDownModal } from "@/components/reports/DrillDownModal";
+import { ReportsExportButton } from "@/components/reports/ReportsExportButton";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { PreferencesModal } from "@/components/preferences/PreferencesModal";
 
 interface ReportFile {
   id: string;
@@ -41,12 +49,10 @@ interface ReportFile {
 }
 
 const Reports = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [languageFilter, setLanguageFilter] = useState("all");
   const [reports, setReports] = useState<ReportFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -56,6 +62,77 @@ const Reports = () => {
   
   // Get session ID from URL if specified
   const sessionId = searchParams.get('session');
+
+  // Initialize drill-down functionality
+  const drillDown = useDrillDown();
+
+  // User preferences hook
+  const {
+    preferences,
+    loading: preferencesLoading,
+    updateVisualizationPreferences,
+    updateFilterPreferences,
+  } = useUserPreferences();
+
+  // Initialize view mode from user preferences
+  const [viewMode, setViewMode] = useState<ViewMode>(preferences.defaultViewMode);
+
+  // Update view mode when preferences change
+  useEffect(() => {
+    setViewMode(preferences.defaultViewMode);
+  }, [preferences.defaultViewMode]);
+
+  // Handle view mode changes and save to preferences
+  const handleViewModeChange = async (newViewMode: ViewMode) => {
+    setViewMode(newViewMode);
+    await updateVisualizationPreferences({ viewMode: newViewMode });
+  };
+
+  // Convert ReportFile to ReportData for the hook
+  const reportData: ReportData[] = reports.map(report => ({
+    id: report.id,
+    name: report.name,
+    uploadedAt: report.uploadedAt,
+    completedAt: report.completedAt,
+    status: report.status,
+    segments: report.segments,
+    errors: report.errors,
+    score: report.score,
+    language: report.language,
+    fileType: report.fileType,
+    fileSize: report.fileSize,
+    modelUsed: report.modelUsed,
+    processingTime: undefined, // Add processing time if available in the future
+  }));
+
+  // Use the enhanced filtering system with user preferences
+  const {
+    filters,
+    updateFilter,
+    updateFilters,
+    resetFilters,
+    filteredData,
+    isFiltering,
+  } = useReportFilters({ 
+    data: reportData,
+    initialFilters: preferences.defaultFilters,
+  });
+
+  // Save filter changes to user preferences (debounced)
+  useEffect(() => {
+    if (!preferencesLoading) {
+      const timeoutId = setTimeout(() => {
+        updateFilterPreferences(filters);
+      }, 1000); // Debounce filter preference saving
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filters, preferencesLoading, updateFilterPreferences]);
+
+  // Extract available options for filters
+  const availableLanguages = Array.from(new Set(reports.map(r => r.language)));
+  const availableModels = Array.from(new Set(reports.map(r => r.modelUsed).filter(Boolean))) as string[];
+  const availableFileTypes = Array.from(new Set(reports.map(r => r.fileType)));
 
   useEffect(() => {
     fetchQASessions();
@@ -170,25 +247,20 @@ const Reports = () => {
       }
 
       console.log('✅ Session deleted:', reportId);
-
+      
       // Remove from local state
-      setReports(prevReports => prevReports.filter(r => r.id !== reportId));
-
+      setReports(prev => prev.filter(r => r.id !== reportId));
+      
       toast({
         title: "Report deleted",
-        description: `Successfully deleted "${reportName}" and all associated data.`,
+        description: `Successfully deleted report "${reportName}".`,
       });
 
-      // If we're viewing the deleted report, navigate back to all reports
-      if (sessionId === reportId) {
-        navigate('/reports');
-      }
-
     } catch (error) {
-      console.error('💥 Error deleting report:', error);
+      console.error('❌ Error in deleteReport:', error);
       toast({
-        title: "Deletion failed",
-        description: error instanceof Error ? error.message : "Failed to delete the report. Please try again.",
+        title: "Error deleting report",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
         variant: "destructive",
       });
     } finally {
@@ -197,61 +269,44 @@ const Reports = () => {
   };
 
   const extractLanguagePair = (fileName: string): string => {
-    // Try to extract language pair from filename (common patterns)
-    const patterns = [
-      /_([a-z]{2})_([a-z]{2})\./i,  // file_en_de.xliff
-      /_([a-z]{2})-([a-z]{2})\./i,  // file_en-de.xliff
-      /([a-z]{2})_to_([a-z]{2})/i,  // en_to_de
-      /([a-z]{2})-([a-z]{2})/i,     // en-de
-    ];
-
-    for (const pattern of patterns) {
-      const match = fileName.match(pattern);
-      if (match) {
-        return `${match[1].toUpperCase()} → ${match[2].toUpperCase()}`;
-      }
+    // Extract language pair from filename (e.g., "en-de", "fr-en")
+    const langMatch = fileName.match(/([a-z]{2})-([a-z]{2})/i);
+    if (langMatch) {
+      return `${langMatch[1].toUpperCase()}-${langMatch[2].toUpperCase()}`;
     }
-
-    return "Unknown";
+    
+    // Fallback: look for single language codes
+    const singleLangMatch = fileName.match(/[_\-\.]([a-z]{2})[_\-\.]/i);
+    if (singleLangMatch) {
+      return singleLangMatch[1].toUpperCase();
+    }
+    
+    return 'Unknown';
   };
 
-  const filteredReports = reports.filter((report) => {
-    const matchesSearch = report.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || report.status === statusFilter;
-    const matchesLanguage = languageFilter === "all" || report.language === languageFilter;
-    const matchesSession = !sessionId || report.id === sessionId;
-    
-    return matchesSearch && matchesStatus && matchesLanguage && matchesSession;
-  });
-
   const getScoreColor = (score: number) => {
-    if (score >= 9) return "text-green-600 bg-green-50";
-    if (score >= 7) return "text-yellow-600 bg-yellow-50";
-    return "text-red-600 bg-red-50";
+    if (score >= 90) return "text-green-600 bg-green-50 border-green-200";
+    if (score >= 70) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-red-600 bg-red-50 border-red-200";
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
-        return "bg-green-100 text-green-800";
-      case 'processing':
-        return "bg-blue-100 text-blue-800";
-      case 'pending':
-        return "bg-yellow-100 text-yellow-800";
-      case 'failed':
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case 'completed': return "text-green-600 bg-green-50 border-green-200";
+      case 'processing': return "text-blue-600 bg-blue-50 border-blue-200";
+      case 'pending': return "text-yellow-600 bg-yellow-50 border-yellow-200";
+      case 'failed': return "text-red-600 bg-red-50 border-red-200";
+      default: return "text-gray-600 bg-gray-50 border-gray-200";
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -264,7 +319,7 @@ const Reports = () => {
   };
 
   const formatModelName = (modelName?: string) => {
-    if (!modelName) return "Unknown";
+    if (!modelName) return 'Unknown';
     
     // Format common model names for better display
     const modelMap: Record<string, string> = {
@@ -278,7 +333,28 @@ const Reports = () => {
     return modelMap[modelName] || modelName;
   };
 
-  const languages = Array.from(new Set(reports.map(r => r.language)));
+  // Helper functions for basic filters
+  const getSelectedStatus = () => {
+    if (filters.status.length === 0) return 'all';
+    if (filters.status.length === 1) return filters.status[0];
+    return 'all';
+  };
+
+  const getSelectedLanguage = () => {
+    return filters.languageFilter || 'all';
+  };
+
+  const handleStatusChange = (value: string) => {
+    if (value === 'all') {
+      updateFilter('status', ['pending', 'processing', 'completed', 'failed']);
+    } else {
+      updateFilter('status', [value]);
+    }
+  };
+
+  const handleLanguageChange = (value: string) => {
+    updateFilter('languageFilter', value);
+  };
 
   const completedReports = reports.filter(r => r.status === 'completed').length;
   const pendingReports = reports.filter(r => r.status === 'processing' || r.status === 'pending').length;
@@ -297,6 +373,17 @@ const Reports = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            <PreferencesModal currentFilters={filters}>
+              <Button variant="outline">
+                <User className="h-4 w-4 mr-2" />
+                Preferences
+              </Button>
+            </PreferencesModal>
+            <ReportsExportButton
+              data={reports}
+              filteredData={filteredData}
+              isFiltering={isFiltering}
+            />
             <Button variant="outline" onClick={fetchQASessions} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -362,14 +449,14 @@ const Reports = () => {
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search reports..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={filters.searchTerm}
+                    onChange={(e) => updateFilter('searchTerm', e.target.value)}
                     className="pl-10"
                   />
                 </div>
               </div>
               
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={getSelectedStatus()} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -382,165 +469,249 @@ const Reports = () => {
                 </SelectContent>
               </Select>
 
-              <Select value={languageFilter} onValueChange={setLanguageFilter}>
+              <Select value={getSelectedLanguage()} onValueChange={handleLanguageChange}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Languages</SelectItem>
-                  {languages.map((lang) => (
+                  {availableLanguages.map((lang) => (
                     <SelectItem key={lang} value={lang}>{lang}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="sm">
+              <AdvancedFilters
+                filters={filters}
+                onFiltersChange={updateFilters}
+                onReset={resetFilters}
+                availableLanguages={availableLanguages}
+                availableModels={availableModels}
+                availableFileTypes={availableFileTypes}
+              >
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={isFiltering ? "border-blue-500 text-blue-600" : ""}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  More Filters
+                  {isFiltering && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1 rounded">•</span>}
+                </Button>
+              </AdvancedFilters>
+
+              <Button variant="outline" size="sm" onClick={resetFilters}>
                 <Filter className="h-4 w-4 mr-2" />
-                More Filters
+                Reset Filters
               </Button>
             </div>
           </CardContent>
         </Card>
 
+        {/* Advanced Filters Dialog */}
+        <AdvancedFilters
+          filters={filters}
+          onFiltersChange={updateFilters}
+          onReset={resetFilters}
+          availableLanguages={availableLanguages}
+          availableModels={availableModels}
+          availableFileTypes={availableFileTypes}
+        >
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className={isFiltering ? "border-blue-500 text-blue-600" : ""}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            More Filters
+            {isFiltering && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1 rounded">•</span>}
+          </Button>
+        </AdvancedFilters>
+
+        {/* Dynamic Visualization Dashboard */}
+        {(viewMode === "charts" || viewMode === "mixed") && (
+          <ReportsVisualizationDashboard
+            data={reportData}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            className="mb-6"
+            onDataPointClick={drillDown.drillDown}
+            enableDrillDown={true}
+          />
+        )}
+
         {/* Reports Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quality Assessment Reports</CardTitle>
-            <CardDescription>
-              {loading ? 'Loading...' : `${filteredReports.length} of ${reports.length} reports`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-                <span className="ml-2 text-gray-600">Loading reports...</span>
+        {(viewMode === "table" || viewMode === "mixed") && (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Quality Assessment Reports</CardTitle>
+                  <CardDescription>
+                    {loading ? 'Loading...' : `${filteredData.length} of ${reports.length} reports`}
+                  </CardDescription>
+                </div>
+                {/* View Mode Selector */}
+                <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
+                  <Button
+                    variant={viewMode === "table" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleViewModeChange("table")}
+                    className="h-8"
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    Table
+                  </Button>
+                  <Button
+                    variant={(viewMode as ViewMode) === "charts" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleViewModeChange("charts")}
+                    className="h-8"
+                  >
+                    <BarChart3 className="h-4 w-4 mr-1" />
+                    Charts
+                  </Button>
+                  <Button
+                    variant={viewMode === "mixed" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleViewModeChange("mixed")}
+                    className="h-8"
+                  >
+                    <Grid3X3 className="h-4 w-4 mr-1" />
+                    Mixed
+                  </Button>
+                </div>
               </div>
-            ) : filteredReports.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
-                <p className="text-gray-600 mb-4">
-                  {reports.length === 0 
-                    ? "Upload your first XLIFF file to generate quality assessment reports." 
-                    : "No reports match your current filters. Try adjusting your search criteria."}
-                </p>
-                <Link to="/upload">
-                  <Button>Upload Files</Button>
-                </Link>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Language</TableHead>
-                    <TableHead>Segments</TableHead>
-                    <TableHead>Errors</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Upload Date</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredReports.map((report) => (
-                    <TableRow key={report.id} className={sessionId === report.id ? "bg-blue-50" : ""}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{report.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {report.fileType.toUpperCase()} • {formatFileSize(report.fileSize)}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-600">Loading reports...</span>
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
+                  <p className="text-gray-600 mb-4">
+                    {reports.length === 0 
+                      ? "Upload your first XLIFF file to generate quality assessment reports." 
+                      : "No reports match your current filters. Try adjusting your search criteria."}
+                  </p>
+                  <Link to="/upload">
+                    <Button>Upload Files</Button>
+                  </Link>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Language</TableHead>
+                      <TableHead>Segments</TableHead>
+                      <TableHead>Errors</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Upload Date</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.map((report) => (
+                      <TableRow 
+                        key={report.id} 
+                        className={`${sessionId === report.id ? "bg-blue-50" : ""} ${report.status === 'completed' ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
+                        onClick={() => {
+                          if (report.status === 'completed') {
+                            drillDown.drillDown({
+                              type: 'file',
+                              value: report.id,
+                              label: report.name,
+                              filters: { fileId: report.id }
+                            });
+                          }
+                        }}
+                      >
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">{report.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {report.fileType.toUpperCase()} • {formatFileSize(report.fileSize)}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getStatusColor(report.status)}>
-                          {report.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium">{report.language}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{report.segments.toLocaleString()}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium text-red-600">
-                          {report.errors}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {report.status === 'completed' && report.score > 0 ? (
-                          <Badge variant="outline" className={getScoreColor(report.score)}>
-                            {report.score.toFixed(1)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusColor(report.status)}>
+                            {report.status}
                           </Badge>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {formatDate(report.uploadedAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Brain className="h-4 w-4 text-blue-500" />
-                          <span className="text-sm font-medium">
-                            {formatModelName(report.modelUsed)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">{report.language}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{report.segments.toLocaleString()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium text-red-600">
+                            {report.errors}
                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {report.status === 'completed' ? (
-                            <>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => {
-                                  console.log('👁️ View Details button clicked for report:', report.id);
-                                  navigate('/report/' + report.id);
-                                }}
-                                title="View detailed report"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Download report">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => deleteReport(report.id, report.name)}
-                                disabled={deleting === report.id}
-                                title="Delete report"
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                              >
-                                {deleting === report.id ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </>
+                        </TableCell>
+                        <TableCell>
+                          {report.status === 'completed' && report.score > 0 ? (
+                            <Badge variant="outline" className={getScoreColor(report.score)}>
+                              {report.score.toFixed(1)}
+                            </Badge>
                           ) : (
-                            <>
-                              <span className="text-sm text-gray-400">
-                                {report.status === 'processing' || report.status === 'pending' 
-                                  ? 'Processing...' 
-                                  : 'Failed'}
-                              </span>
-                              {/* Allow deletion of failed reports */}
-                              {report.status === 'failed' && (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {formatDate(report.uploadedAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Brain className="h-4 w-4 text-blue-500" />
+                            <span className="text-sm font-medium">
+                              {formatModelName(report.modelUsed)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {report.status === 'completed' ? (
+                              <>
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
-                                  onClick={() => deleteReport(report.id, report.name)}
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent row click
+                                    console.log('👁️ View Details button clicked for report:', report.id);
+                                    navigate('/report/' + report.id);
+                                  }}
+                                  title="View detailed report"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  title="Download report"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent row click
+                                    deleteReport(report.id, report.name);
+                                  }}
                                   disabled={deleting === report.id}
-                                  title="Delete failed report"
+                                  title="Delete report"
                                   className="text-red-600 hover:text-red-800 hover:bg-red-50"
                                 >
                                   {deleting === report.id ? (
@@ -549,18 +720,58 @@ const Reports = () => {
                                     <Trash2 className="h-4 w-4" />
                                   )}
                                 </Button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-sm text-gray-400">
+                                  {report.status === 'processing' || report.status === 'pending' 
+                                    ? 'Processing...' 
+                                    : 'Failed'}
+                                </span>
+                                {/* Allow deletion of failed reports */}
+                                {report.status === 'failed' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent row click
+                                      deleteReport(report.id, report.name);
+                                    }}
+                                    disabled={deleting === report.id}
+                                    title="Delete failed report"
+                                    className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  >
+                                    {deleting === report.id ? (
+                                      <RefreshCw className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Drill-Down Modal */}
+        <DrillDownModal
+          open={drillDown.isModalOpen}
+          onOpenChange={drillDown.closeModal}
+          navigationPath={drillDown.navigationPath}
+          currentLevel={drillDown.currentLevel}
+          data={drillDown.data}
+          onNavigateBack={drillDown.navigateBack}
+          onResetToOverview={drillDown.resetToOverview}
+          canNavigateBack={drillDown.canNavigateBack}
+        />
       </div>
     </div>
   );

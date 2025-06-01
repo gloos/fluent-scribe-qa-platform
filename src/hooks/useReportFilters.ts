@@ -9,20 +9,27 @@ export interface FilterState {
   fileSize: string;
   processingTimeRange: [number, number];
   status: string[];
+  errorRange: [number, number];
+  segmentRange: [number, number];
+  modelFilter: string;
+  fileSizeRange: [number, number];
+  searchTerm: string;
 }
 
 export interface ReportData {
   id: string;
   name: string;
   uploadedAt: string;
-  status: 'processing' | 'completed' | 'error';
+  completedAt: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   segments: number;
   errors: number;
   score: number;
   language: string;
+  fileType: string;
+  fileSize: number;
+  modelUsed?: string;
   processingTime?: number;
-  fileSize?: number;
-  reportType: string;
 }
 
 export interface TrendData {
@@ -76,93 +83,39 @@ const defaultFilters: FilterState = {
   dateRange: { from: null, to: null },
   fileSize: 'all',
   processingTimeRange: [0, 60],
-  status: ['processing', 'completed', 'error'],
+  status: ['processing', 'completed', 'failed', 'pending'],
+  errorRange: [0, 1000],
+  segmentRange: [0, 10000],
+  modelFilter: 'all',
+  fileSizeRange: [0, 100],
+  searchTerm: '',
 };
 
-// Mock data that will be filtered
-const mockReportData: ReportData[] = [
-  {
-    id: '1',
-    name: 'product_catalog_en_de.xliff',
-    uploadedAt: '2024-01-15T10:30:00Z',
-    status: 'completed',
-    segments: 245,
-    errors: 8,
-    score: 8.9,
-    language: 'EN → DE',
-    processingTime: 3.2,
-    fileSize: 2.4,
-    reportType: 'xliff',
-  },
-  {
-    id: '2',
-    name: 'user_manual_fr_en.xliff',
-    uploadedAt: '2024-01-15T09:15:00Z',
-    status: 'processing',
-    segments: 567,
-    errors: 0,
-    score: 0,
-    language: 'FR → EN',
-    fileSize: 4.1,
-    reportType: 'xliff',
-  },
-  {
-    id: '3',
-    name: 'marketing_copy_es_en.mxliff',
-    uploadedAt: '2024-01-14T16:45:00Z',
-    status: 'completed',
-    segments: 123,
-    errors: 3,
-    score: 9.2,
-    language: 'ES → EN',
-    processingTime: 2.1,
-    fileSize: 1.8,
-    reportType: 'mxliff',
-  },
-  {
-    id: '4',
-    name: 'legal_docs_de_en.xliff',
-    uploadedAt: '2024-01-14T14:20:00Z',
-    status: 'completed',
-    segments: 789,
-    errors: 23,
-    score: 7.8,
-    language: 'DE → EN',
-    processingTime: 6.8,
-    fileSize: 5.2,
-    reportType: 'xliff',
-  },
-  {
-    id: '5',
-    name: 'technical_manual_ja_en.tmx',
-    uploadedAt: '2024-01-13T11:30:00Z',
-    status: 'completed',
-    segments: 456,
-    errors: 12,
-    score: 8.5,
-    language: 'JA → EN',
-    processingTime: 4.5,
-    fileSize: 3.2,
-    reportType: 'tmx',
-  },
-  {
-    id: '6',
-    name: 'website_content_zh_en.xliff',
-    uploadedAt: '2024-01-12T15:20:00Z',
-    status: 'error',
-    segments: 234,
-    errors: 0,
-    score: 0,
-    language: 'ZH → EN',
-    fileSize: 2.8,
-    reportType: 'xliff',
-  },
-];
+interface UseReportFiltersProps {
+  data?: ReportData[];
+  initialFilters?: Partial<FilterState>;
+}
 
-export const useReportFilters = () => {
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+export const useReportFilters = (props: UseReportFiltersProps = {}) => {
+  const { data = [], initialFilters } = props;
+  
+  // Merge default filters with initial filters
+  const mergedInitialFilters = useMemo(() => ({
+    ...defaultFilters,
+    ...initialFilters,
+  }), [initialFilters]);
+  
+  const [filters, setFilters] = useState<FilterState>(mergedInitialFilters);
   const [isFiltering, setIsFiltering] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<FilterState | null>(null);
+
+  // Update filters when initialFilters change
+  useEffect(() => {
+    if (initialFilters) {
+      const newFilters = { ...defaultFilters, ...initialFilters };
+      setFilters(newFilters);
+    }
+  }, [initialFilters]);
 
   const updateFilter = <K extends keyof FilterState>(
     key: K,
@@ -195,7 +148,21 @@ export const useReportFilters = () => {
 
   // Filter the data based on current filter state
   const filteredData = useMemo(() => {
-    let filtered = [...mockReportData];
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    let filtered = [...data];
+
+    // Search term filter
+    if (filters.searchTerm.trim()) {
+      const searchLower = filters.searchTerm.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(searchLower) ||
+        item.language.toLowerCase().includes(searchLower) ||
+        (item.modelUsed && item.modelUsed.toLowerCase().includes(searchLower))
+      );
+    }
 
     // Time range filter
     if (filters.timeRange !== 'all') {
@@ -217,25 +184,24 @@ export const useReportFilters = () => {
       }
     }
 
-    // Report type filter
+    // Custom date range filter (overrides timeRange if set)
+    if (filters.dateRange.from || filters.dateRange.to) {
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.uploadedAt);
+        if (filters.dateRange.from && itemDate < filters.dateRange.from) return false;
+        if (filters.dateRange.to && itemDate > filters.dateRange.to) return false;
+        return true;
+      });
+    }
+
+    // Report type filter (file type)
     if (filters.reportType !== 'all') {
-      filtered = filtered.filter(item => item.reportType === filters.reportType);
+      filtered = filtered.filter(item => item.fileType === filters.reportType);
     }
 
     // Language filter
     if (filters.languageFilter !== 'all') {
-      const languageMap = {
-        'en-de': 'EN → DE',
-        'fr-en': 'FR → EN',
-        'es-en': 'ES → EN',
-        'de-en': 'DE → EN',
-        'ja-en': 'JA → EN',
-        'zh-en': 'ZH → EN',
-      };
-      const targetLanguage = languageMap[filters.languageFilter as keyof typeof languageMap];
-      if (targetLanguage) {
-        filtered = filtered.filter(item => item.language === targetLanguage);
-      }
+      filtered = filtered.filter(item => item.language === filters.languageFilter);
     }
 
     // Score range filter
@@ -244,10 +210,51 @@ export const useReportFilters = () => {
       item.score <= filters.scoreRange[1]
     );
 
+    // Error range filter
+    filtered = filtered.filter(item => 
+      item.errors >= filters.errorRange[0] && 
+      item.errors <= filters.errorRange[1]
+    );
+
+    // Segment range filter
+    filtered = filtered.filter(item => 
+      item.segments >= filters.segmentRange[0] && 
+      item.segments <= filters.segmentRange[1]
+    );
+
     // Status filter
     filtered = filtered.filter(item => 
       filters.status.includes(item.status)
     );
+
+    // Model filter
+    if (filters.modelFilter !== 'all') {
+      filtered = filtered.filter(item => item.modelUsed === filters.modelFilter);
+    }
+
+    // File size range filter (convert bytes to MB)
+    filtered = filtered.filter(item => {
+      const fileSizeMB = item.fileSize / (1024 * 1024);
+      return fileSizeMB >= filters.fileSizeRange[0] && 
+             fileSizeMB <= filters.fileSizeRange[1];
+    });
+
+    // File size category filter
+    if (filters.fileSize !== 'all') {
+      filtered = filtered.filter(item => {
+        const fileSizeMB = item.fileSize / (1024 * 1024);
+        switch (filters.fileSize) {
+          case 'small':
+            return fileSizeMB < 2;
+          case 'medium':
+            return fileSizeMB >= 2 && fileSizeMB <= 5;
+          case 'large':
+            return fileSizeMB > 5;
+          default:
+            return true;
+        }
+      });
+    }
 
     // Processing time filter (only for completed files)
     filtered = filtered.filter(item => {
@@ -257,7 +264,7 @@ export const useReportFilters = () => {
     });
 
     return filtered;
-  }, [filters]);
+  }, [data, filters]);
 
   // Generate chart data from filtered data
   const chartData = useMemo((): ChartData => {
@@ -312,7 +319,7 @@ export const useReportFilters = () => {
       { category: 'Formatting', count: Math.floor(Math.random() * 25) + 5 },
     ].map(item => ({
       ...item,
-      count: Math.floor(item.count * (filteredData.length / mockReportData.length))
+      count: Math.floor(item.count * (filteredData.length / data.length))
     }));
 
     // Processing Efficiency
@@ -340,7 +347,7 @@ export const useReportFilters = () => {
       issueAnalysis,
       processingEfficiency,
     };
-  }, [filteredData]);
+  }, [filteredData, data]);
 
   // Helper function to calculate trend data
   const calculateTrend = (current: number, previous: number, format: 'number' | 'decimal' | 'percentage' = 'number'): TrendData => {
@@ -383,7 +390,7 @@ export const useReportFilters = () => {
     const currentPeriodStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const previousPeriodStart = new Date(currentPeriodStart.getTime() - days * 24 * 60 * 60 * 1000);
     
-    return mockReportData.filter(item => {
+    return data.filter(item => {
       const itemDate = new Date(item.uploadedAt);
       return itemDate >= previousPeriodStart && itemDate < currentPeriodStart;
     });
@@ -477,7 +484,7 @@ export const useReportFilters = () => {
       dailyThroughput: calculateTrend(dailyThroughput, prevDailyThroughput, 'decimal'),
       efficiencyRatio: calculateTrend(efficiencyRatio, prevEfficiencyRatio, 'decimal'),
     };
-  }, [filteredData, filters.timeRange]);
+  }, [filteredData, filters.timeRange, data]);
 
   return {
     filters,

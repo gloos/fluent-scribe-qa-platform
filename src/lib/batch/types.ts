@@ -123,6 +123,13 @@ export enum JobPriority {
   IMMEDIATE = 5
 }
 
+export enum ExportFormatType {
+  JSON = 'json',
+  CSV = 'csv',
+  EXCEL = 'excel',
+  PDF = 'pdf'
+}
+
 export interface QueueConfig {
   maxConcurrentJobs: number
   maxQueueSize: number
@@ -739,6 +746,46 @@ export interface ExportFormat {
     // Custom options
     customConfig?: Record<string, any>
   }
+}
+
+export interface ExportConfig {
+  filename?: string
+  format?: string
+  
+  // JSON specific options
+  jsonOptions?: {
+    indent?: number
+    pretty?: boolean
+    compression?: boolean
+  }
+  
+  // CSV specific options
+  csvOptions?: {
+    delimiter?: ',' | ';' | '\t'
+    quote?: string
+    escape?: string
+    newline?: string
+    columns?: string[]
+    headers?: boolean
+    encoding?: 'utf-8' | 'latin1'
+  }
+  
+  // Excel specific options
+  excelOptions?: {
+    worksheets?: string[]
+    includeFormulas?: boolean
+    formatting?: boolean
+  }
+  
+  // PDF specific options
+  pdfOptions?: {
+    pageSize?: 'A4' | 'Letter' | 'Legal'
+    orientation?: 'portrait' | 'landscape'
+    includeCharts?: boolean
+  }
+  
+  // Custom options for any format
+  customOptions?: Record<string, any>
 }
 
 // Default configurations

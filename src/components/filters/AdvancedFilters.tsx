@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Filter, RotateCcw } from "lucide-react";
+import { CalendarIcon, Filter, RotateCcw, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { type FilterState } from "@/hooks/useReportFilters";
@@ -35,13 +36,21 @@ interface AdvancedFiltersProps {
   onFiltersChange: (filters: Partial<FilterState>) => void;
   onReset: () => void;
   children: React.ReactNode;
+  
+  // Additional props for enhanced filtering
+  availableLanguages?: string[];
+  availableModels?: string[];
+  availableFileTypes?: string[];
 }
 
 export function AdvancedFilters({ 
   filters, 
   onFiltersChange, 
   onReset, 
-  children 
+  children,
+  availableLanguages = [],
+  availableModels = [],
+  availableFileTypes = []
 }: AdvancedFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
@@ -61,7 +70,12 @@ export function AdvancedFilters({
       dateRange: { from: null, to: null },
       fileSize: 'all',
       processingTimeRange: [0, 60],
-      status: ['processing', 'completed', 'error'],
+      status: ['processing', 'completed', 'failed', 'pending'],
+      errorRange: [0, 1000],
+      segmentRange: [0, 10000],
+      modelFilter: 'all',
+      fileSizeRange: [0, 100],
+      searchTerm: '',
     });
     setIsOpen(false);
   };
@@ -76,7 +90,8 @@ export function AdvancedFilters({
   const statusOptions = [
     { id: 'processing', label: 'Processing' },
     { id: 'completed', label: 'Completed' },
-    { id: 'error', label: 'Error' },
+    { id: 'failed', label: 'Failed' },
+    { id: 'pending', label: 'Pending' },
   ];
 
   const fileSizeOptions = [
@@ -89,10 +104,15 @@ export function AdvancedFilters({
   // Count active advanced filters
   const activeFiltersCount = [
     localFilters.scoreRange[0] !== 0 || localFilters.scoreRange[1] !== 10,
+    localFilters.errorRange[0] !== 0 || localFilters.errorRange[1] !== 1000,
+    localFilters.segmentRange[0] !== 0 || localFilters.segmentRange[1] !== 10000,
     localFilters.dateRange.from !== null || localFilters.dateRange.to !== null,
     localFilters.fileSize !== 'all',
+    localFilters.fileSizeRange[0] !== 0 || localFilters.fileSizeRange[1] !== 100,
     localFilters.processingTimeRange[0] !== 0 || localFilters.processingTimeRange[1] !== 60,
-    localFilters.status.length !== 3,
+    localFilters.status.length !== 4,
+    localFilters.modelFilter !== 'all',
+    localFilters.searchTerm.trim() !== '',
   ].filter(Boolean).length;
 
   return (
@@ -107,18 +127,32 @@ export function AdvancedFilters({
           )}
         </div>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
             Advanced Filters
           </DialogTitle>
           <DialogDescription>
-            Apply additional filters to refine your dashboard data
+            Apply comprehensive filters to refine your dashboard data
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
+          {/* Search Term */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by filename, language, or model..."
+                value={localFilters.searchTerm}
+                onChange={(e) => updateLocalFilter('searchTerm', e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
           {/* Quality Score Range */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Quality Score Range</Label>
@@ -134,6 +168,63 @@ export function AdvancedFilters({
               <div className="flex justify-between text-sm text-muted-foreground mt-1">
                 <span>{localFilters.scoreRange[0]}</span>
                 <span>{localFilters.scoreRange[1]}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Count Range */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Error Count Range</Label>
+            <div className="px-3">
+              <Slider
+                min={0}
+                max={1000}
+                step={1}
+                value={localFilters.errorRange}
+                onValueChange={(value) => updateLocalFilter('errorRange', value as [number, number])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                <span>{localFilters.errorRange[0]}</span>
+                <span>{localFilters.errorRange[1]}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Segment Count Range */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Segment Count Range</Label>
+            <div className="px-3">
+              <Slider
+                min={0}
+                max={10000}
+                step={10}
+                value={localFilters.segmentRange}
+                onValueChange={(value) => updateLocalFilter('segmentRange', value as [number, number])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                <span>{localFilters.segmentRange[0]}</span>
+                <span>{localFilters.segmentRange[1]}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* File Size Range (MB) */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">File Size Range (MB)</Label>
+            <div className="px-3">
+              <Slider
+                min={0}
+                max={100}
+                step={0.1}
+                value={localFilters.fileSizeRange}
+                onValueChange={(value) => updateLocalFilter('fileSizeRange', value as [number, number])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                <span>{localFilters.fileSizeRange[0]} MB</span>
+                <span>{localFilters.fileSizeRange[1]} MB</span>
               </div>
             </div>
           </div>
@@ -216,9 +307,72 @@ export function AdvancedFilters({
             </div>
           </div>
 
-          {/* File Size */}
+          {/* File Type Filter */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">File Size</Label>
+            <Label className="text-sm font-medium">File Type</Label>
+            <Select
+              value={localFilters.reportType}
+              onValueChange={(value) => updateLocalFilter('reportType', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select file type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {availableFileTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type.toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Language Filter */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Language</Label>
+            <Select
+              value={localFilters.languageFilter}
+              onValueChange={(value) => updateLocalFilter('languageFilter', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Languages</SelectItem>
+                {availableLanguages.map((language) => (
+                  <SelectItem key={language} value={language}>
+                    {language}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Model Filter */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">AI Model</Label>
+            <Select
+              value={localFilters.modelFilter}
+              onValueChange={(value) => updateLocalFilter('modelFilter', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Models</SelectItem>
+                {availableModels.map((model) => (
+                  <SelectItem key={model} value={model}>
+                    {model}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* File Size Categories */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">File Size Category</Label>
             <Select
               value={localFilters.fileSize}
               onValueChange={(value) => updateLocalFilter('fileSize', value)}
@@ -258,7 +412,7 @@ export function AdvancedFilters({
           {/* File Status */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">File Status</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {statusOptions.map((status) => (
                 <div key={status.id} className="flex items-center space-x-2">
                   <Checkbox

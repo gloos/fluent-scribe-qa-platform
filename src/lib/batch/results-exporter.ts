@@ -1,11 +1,10 @@
 import {
   AggregatedResult,
   ExportFormat,
+  ExportFormatType,
   ResultsReport,
   ExportConfig,
-  ProcessingResult,
-  BatchJob,
-  BatchProcessingStatus
+  ProcessingResult
 } from './types';
 
 // Export utilities and formatting
@@ -18,7 +17,7 @@ export interface ExportContext {
 
 export interface ExportResult {
   success: boolean;
-  format: ExportFormat;
+  format: ExportFormatType;
   data?: Blob | string | ArrayBuffer;
   filename: string;
   size: number;
@@ -31,7 +30,7 @@ export interface ExportResult {
  */
 export class ExportTemplate {
   constructor(
-    public format: ExportFormat,
+    public format: ExportFormatType,
     public template: string,
     public variables: Record<string, any> = {}
   ) {}
@@ -100,7 +99,7 @@ export class JSONExporter {
       
       return {
         success: true,
-        format: ExportFormat.JSON,
+        format: ExportFormatType.JSON,
         data: blob,
         filename: config.filename || `results-${Date.now()}.json`,
         size: blob.size,
@@ -112,7 +111,7 @@ export class JSONExporter {
     } catch (error) {
       return {
         success: false,
-        format: ExportFormat.JSON,
+        format: ExportFormatType.JSON,
         filename: '',
         size: 0,
         error: `JSON export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -136,7 +135,7 @@ export class CSVExporter {
 
       return {
         success: true,
-        format: ExportFormat.CSV,
+        format: ExportFormatType.CSV,
         data: blob,
         filename: config.filename || `results-${Date.now()}.csv`,
         size: blob.size,
@@ -148,7 +147,7 @@ export class CSVExporter {
     } catch (error) {
       return {
         success: false,
-        format: ExportFormat.CSV,
+        format: ExportFormatType.CSV,
         filename: '',
         size: 0,
         error: `CSV export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -308,7 +307,7 @@ export class ExcelExporter {
 
       return {
         success: true,
-        format: ExportFormat.EXCEL,
+        format: ExportFormatType.EXCEL,
         data: blob,
         filename: config.filename || `results-${Date.now()}.xlsx`,
         size: blob.size,
@@ -320,7 +319,7 @@ export class ExcelExporter {
     } catch (error) {
       return {
         success: false,
-        format: ExportFormat.EXCEL,
+        format: ExportFormatType.EXCEL,
         filename: '',
         size: 0,
         error: `Excel export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -361,7 +360,7 @@ export class PDFExporter {
 
       return {
         success: true,
-        format: ExportFormat.PDF,
+        format: ExportFormatType.PDF,
         data: blob,
         filename: config.filename || `results-${Date.now()}.html`, // Would be .pdf with real implementation
         size: blob.size,
@@ -373,7 +372,7 @@ export class PDFExporter {
     } catch (error) {
       return {
         success: false,
-        format: ExportFormat.PDF,
+        format: ExportFormatType.PDF,
         filename: '',
         size: 0,
         error: `PDF export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -559,7 +558,7 @@ export class PDFExporter {
  * Main results exporter class that coordinates different format exporters
  */
 export class BatchResultsExporter {
-  private templates: Map<ExportFormat, ExportTemplate> = new Map();
+  private templates: Map<ExportFormatType, ExportTemplate> = new Map();
 
   constructor() {
     this.initializeDefaultTemplates();
@@ -575,16 +574,16 @@ export class BatchResultsExporter {
   ): Promise<ExportResult> {
     try {
       switch (config.format) {
-        case ExportFormat.JSON:
+        case ExportFormatType.JSON:
           return JSONExporter.export(data, config, context);
         
-        case ExportFormat.CSV:
+        case ExportFormatType.CSV:
           return CSVExporter.export(data, config, context);
         
-        case ExportFormat.EXCEL:
+        case ExportFormatType.EXCEL:
           return ExcelExporter.export(data, config, context);
         
-        case ExportFormat.PDF:
+        case ExportFormatType.PDF:
           return PDFExporter.export(data, config, context);
         
         default:
@@ -622,15 +621,15 @@ export class BatchResultsExporter {
   /**
    * Register a custom template for a format
    */
-  registerTemplate(format: ExportFormat, template: ExportTemplate): void {
+  registerTemplate(format: ExportFormatType, template: ExportTemplate): void {
     this.templates.set(format, template);
   }
 
   /**
    * Get available export formats
    */
-  getAvailableFormats(): ExportFormat[] {
-    return Object.values(ExportFormat);
+  getAvailableFormats(): ExportFormatType[] {
+    return Object.values(ExportFormatType);
   }
 
   /**
@@ -643,7 +642,7 @@ export class BatchResultsExporter {
       errors.push('Export format is required');
     }
 
-    if (!Object.values(ExportFormat).includes(config.format)) {
+    if (!Object.values(ExportFormatType).includes(config.format)) {
       errors.push(`Invalid export format: ${config.format}`);
     }
 
@@ -663,20 +662,20 @@ export class BatchResultsExporter {
 
   private initializeDefaultTemplates(): void {
     // Initialize default templates for each format
-    this.templates.set(ExportFormat.JSON, new ExportTemplate(
-      ExportFormat.JSON,
+    this.templates.set(ExportFormatType.JSON, new ExportTemplate(
+      ExportFormatType.JSON,
       '{{data}}',
       { timestamp: '{{timestamp}}' }
     ));
 
-    this.templates.set(ExportFormat.CSV, new ExportTemplate(
-      ExportFormat.CSV,
+    this.templates.set(ExportFormatType.CSV, new ExportTemplate(
+      ExportFormatType.CSV,
       'CSV Export Template',
       { delimiter: ',' }
     ));
 
-    this.templates.set(ExportFormat.PDF, new ExportTemplate(
-      ExportFormat.PDF,
+    this.templates.set(ExportFormatType.PDF, new ExportTemplate(
+      ExportFormatType.PDF,
       PDFExporter['getDefaultTemplate'](),
       { style: 'default' }
     ));
@@ -691,7 +690,7 @@ export const exportUtils = {
   /**
    * Generate filename with timestamp and format
    */
-  generateFilename(prefix: string, format: ExportFormat, timestamp?: Date): string {
+  generateFilename(prefix: string, format: ExportFormatType, timestamp?: Date): string {
     const ts = timestamp || new Date();
     const dateStr = ts.toISOString().slice(0, 10);
     const timeStr = ts.toTimeString().slice(0, 8).replace(/:/g, '-');
@@ -703,12 +702,12 @@ export const exportUtils = {
   /**
    * Get file extension for format
    */
-  getFileExtension(format: ExportFormat): string {
+  getFileExtension(format: ExportFormatType): string {
     const extensions = {
-      [ExportFormat.JSON]: 'json',
-      [ExportFormat.CSV]: 'csv',
-      [ExportFormat.EXCEL]: 'xlsx',
-      [ExportFormat.PDF]: 'pdf'
+      [ExportFormatType.JSON]: 'json',
+      [ExportFormatType.CSV]: 'csv',
+      [ExportFormatType.EXCEL]: 'xlsx',
+      [ExportFormatType.PDF]: 'pdf'
     };
     return extensions[format] || 'txt';
   },
@@ -716,12 +715,12 @@ export const exportUtils = {
   /**
    * Get MIME type for format
    */
-  getMimeType(format: ExportFormat): string {
+  getMimeType(format: ExportFormatType): string {
     const mimeTypes = {
-      [ExportFormat.JSON]: 'application/json',
-      [ExportFormat.CSV]: 'text/csv',
-      [ExportFormat.EXCEL]: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      [ExportFormat.PDF]: 'application/pdf'
+      [ExportFormatType.JSON]: 'application/json',
+      [ExportFormatType.CSV]: 'text/csv',
+      [ExportFormatType.EXCEL]: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      [ExportFormatType.PDF]: 'application/pdf'
     };
     return mimeTypes[format] || 'text/plain';
   },
