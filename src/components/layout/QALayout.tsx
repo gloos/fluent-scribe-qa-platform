@@ -2,6 +2,8 @@ import React from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { FeedbackButton } from '@/components/feedback/FeedbackButton'
+import { FeedbackTargetType, FeedbackFormData } from '@/lib/types/user-feedback'
 
 // QA Session Layout for organizing analysis content
 interface QASessionLayoutProps {
@@ -63,6 +65,25 @@ export const QASessionLayout: React.FC<QASessionLayoutProps> = ({
                 )}
               </div>
             </div>
+            
+            {/* Session-level Feedback */}
+            {sessionInfo.status === 'completed' && (
+              <div className="flex items-center gap-2">
+                <FeedbackButton
+                  targetType={FeedbackTargetType.ASSESSMENT_RESULT}
+                  targetId={`session-${sessionInfo.fileName}`}
+                  onFeedbackSubmit={async (feedbackData: FeedbackFormData) => {
+                    console.log('Feedback submitted for session:', sessionInfo.fileName, feedbackData)
+                    // Here you would typically call your feedback service
+                    // await feedbackService.submitFeedback(feedbackData)
+                  }}
+                  size="md"
+                  variant="button"
+                  showQuickRating={true}
+                  showFeedbackCount={true}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -200,16 +221,40 @@ export const TranslationSegmentLayout: React.FC<TranslationSegmentLayoutProps> =
                   )}
                 >
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium">{error.type}</p>
                       <p className="text-muted-foreground mt-1">{error.description}</p>
                     </div>
-                    <Badge
-                      variant={error.severity === 'critical' ? 'destructive' : 'secondary'}
-                      className="ml-2"
-                    >
-                      {error.severity}
-                    </Badge>
+                    <div className="flex items-center gap-2 ml-2">
+                      <Badge
+                        variant={error.severity === 'critical' ? 'destructive' : 'secondary'}
+                      >
+                        {error.severity}
+                      </Badge>
+                      
+                      {/* Feedback Button for individual errors */}
+                      <FeedbackButton
+                        targetType={FeedbackTargetType.ERROR_CATEGORIZATION}
+                        targetId={error.id}
+                        currentCategorization={{
+                          dimension: error.type,
+                          category: error.type,
+                          subcategory: '',
+                          severity: error.severity,
+                          source_text: sourceText || '',
+                          target_text: targetText || '',
+                          error_description: error.description
+                        }}
+                        onFeedbackSubmit={async (feedbackData: FeedbackFormData) => {
+                          console.log('Feedback submitted for segment error:', error.id, feedbackData)
+                          // Here you would typically call your feedback service
+                          // await feedbackService.submitFeedback(feedbackData)
+                        }}
+                        size="sm"
+                        variant="icon"
+                        showQuickRating={true}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

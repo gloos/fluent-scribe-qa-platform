@@ -83,4 +83,25 @@ export type {
   ResetProgressDialogProps,
   DiscardChangesDialogProps,
   BulkActionDialogProps
-} from './ConfirmDialog' 
+} from './ConfirmDialog'
+
+// Feedback collection components
+export {
+  FeedbackButton,
+  ErrorFeedbackButton,
+  AssessmentFeedbackButton
+} from './FeedbackButton'
+
+export {
+  QuickThumbsRating,
+  StarRatingInline
+} from './FeedbackRating'
+
+export {
+  default as FeedbackForm
+} from './FeedbackForm'
+
+// Demo and integration examples
+export {
+  FeedbackIntegrationDemo
+} from './FeedbackIntegrationDemo' 

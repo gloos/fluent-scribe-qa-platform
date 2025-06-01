@@ -46,7 +46,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     
     // Enhanced security settings
     flowType: 'pkce', // Use PKCE flow for better security
-    debug: process.env.NODE_ENV === 'development'
+    debug: false // Disabled debug logging to prevent console spam
   },
   
   // Global options

@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Reports from "./pages/Reports";
+import DetailedReport from "./pages/DetailedReport";
 import Billing from "./pages/Billing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -18,6 +19,8 @@ import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityAdmin from '@/pages/SecurityAdmin';
+import FeedbackDemo from './pages/FeedbackDemo';
+import QAErrors from './pages/QAErrors';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +47,11 @@ const App = () => (
           <Route path="/reports" element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          } />
+          <Route path="/report/:reportId" element={
+            <ProtectedRoute>
+              <DetailedReport />
             </ProtectedRoute>
           } />
           <Route path="/billing" element={
@@ -73,6 +81,18 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<EmailVerification />} />
+          
+          {/* New Feedback and QA Routes */}
+          <Route path="/feedback-demo" element={
+            <ProtectedRoute>
+              <FeedbackDemo />
+            </ProtectedRoute>
+          } />
+          <Route path="/qa-errors" element={
+            <ProtectedRoute>
+              <QAErrors />
+            </ProtectedRoute>
+          } />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

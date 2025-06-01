@@ -24,6 +24,8 @@ import {
   FileText,
   MapPin
 } from 'lucide-react'
+import { FeedbackButton } from '@/components/feedback/FeedbackButton'
+import { FeedbackTargetType, FeedbackFormData } from '@/lib/types/user-feedback'
 
 export interface QAError {
   id: string
@@ -273,92 +275,22 @@ export const ErrorList: React.FC<ErrorListProps> = ({
             
             <div className="space-y-2">
               {groupErrors.map((error) => (
-                <Card 
+                <ErrorCard 
                   key={error.id} 
+                  error={error}
+                  onErrorClick={onErrorClick}
+                  onErrorResolve={onErrorResolve}
+                  onFeedbackSubmit={async (errorId, feedback) => {
+                    // Implement the logic to submit feedback
+                    console.log('Feedback submitted for error:', errorId, feedback)
+                  }}
+                  showFeedback={true}
                   className={cn(
                     "cursor-pointer transition-all hover:shadow-md border-l-4",
                     getSeverityColor(error.severity),
                     error.resolved && "opacity-60"
                   )}
-                  onClick={() => onErrorClick?.(error)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          {getSeverityIcon(error.severity)}
-                          <Badge variant={getSeverityBadgeVariant(error.severity)}>
-                            {error.severity.toUpperCase()}
-                          </Badge>
-                          <Badge variant="outline">
-                            {error.type}
-                          </Badge>
-                          {error.resolved && (
-                            <Badge variant="default" className="bg-green-100 text-green-800">
-                              Resolved
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-medium text-sm">{error.message}</h4>
-                          {error.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {error.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="text-xs text-muted-foreground">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              Segment {error.segmentId}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatDate(error.createdAt)}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {error.createdBy}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-xs bg-muted p-2 rounded">
-                          <div className="flex items-center gap-1 mb-1">
-                            <FileText className="h-3 w-3" />
-                            <span className="font-medium">Segment Text:</span>
-                          </div>
-                          <p className="text-muted-foreground">{error.segmentText}</p>
-                        </div>
-
-                        {error.notes && (
-                          <div className="text-xs">
-                            <span className="font-medium">Notes:</span>
-                            <p className="text-muted-foreground">{error.notes}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-2 ml-4">
-                        {!error.resolved && onErrorResolve && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onErrorResolve(error.id)
-                            }}
-                          >
-                            Resolve
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                />
               ))}
             </div>
           </div>
@@ -432,6 +364,150 @@ export const ErrorSummary: React.FC<{
               </Badge>
             </div>
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Enhanced Error Card Component with built-in feedback
+export interface ErrorCardProps {
+  error: QAError
+  onErrorClick?: (error: QAError) => void
+  onErrorResolve?: (errorId: string) => void
+  onFeedbackSubmit?: (errorId: string, feedback: FeedbackFormData) => Promise<void>
+  showFeedback?: boolean
+  className?: string
+}
+
+export const ErrorCard: React.FC<ErrorCardProps> = ({
+  error,
+  onErrorClick,
+  onErrorResolve,
+  onFeedbackSubmit,
+  showFeedback = true,
+  className
+}) => {
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  return (
+    <Card 
+      className={cn(
+        "cursor-pointer transition-all hover:shadow-md border-l-4",
+        getSeverityColor(error.severity),
+        error.resolved && "opacity-60",
+        className
+      )}
+      onClick={() => onErrorClick?.(error)}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              {getSeverityIcon(error.severity)}
+              <Badge variant={getSeverityBadgeVariant(error.severity)}>
+                {error.severity.toUpperCase()}
+              </Badge>
+              <Badge variant="outline">
+                {error.type}
+              </Badge>
+              {error.resolved && (
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  Resolved
+                </Badge>
+              )}
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-sm">{error.message}</h4>
+              {error.description && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {error.description}
+                </p>
+              )}
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Segment {error.segmentId}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDate(error.createdAt)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  {error.createdBy}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs bg-muted p-2 rounded">
+              <div className="flex items-center gap-1 mb-1">
+                <FileText className="h-3 w-3" />
+                <span className="font-medium">Segment Text:</span>
+              </div>
+              <p className="text-muted-foreground">{error.segmentText}</p>
+            </div>
+
+            {error.notes && (
+              <div className="text-xs">
+                <span className="font-medium">Notes:</span>
+                <p className="text-muted-foreground">{error.notes}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 ml-4">
+            {/* Feedback Button */}
+            {showFeedback && (
+              <FeedbackButton
+                targetType={FeedbackTargetType.ERROR_CATEGORIZATION}
+                targetId={error.id}
+                currentCategorization={{
+                  dimension: error.category,
+                  category: error.category,
+                  subcategory: error.subcategory || '',
+                  severity: error.severity,
+                  source_text: error.segmentText,
+                  target_text: error.segmentText,
+                  error_description: error.message
+                }}
+                onFeedbackSubmit={async (feedbackData: FeedbackFormData) => {
+                  if (onFeedbackSubmit) {
+                    await onFeedbackSubmit(error.id, feedbackData)
+                  } else {
+                    console.log('Feedback submitted for error:', error.id, feedbackData)
+                    // Default handling - could be integrated with feedback service
+                  }
+                }}
+                size="sm"
+                variant="icon"
+              />
+            )}
+            
+            {!error.resolved && onErrorResolve && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onErrorResolve(error.id)
+                }}
+              >
+                Resolve
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

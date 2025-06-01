@@ -432,6 +432,139 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create user_feedback table for collecting feedback on error categorizations and system effectiveness
+CREATE TABLE IF NOT EXISTS public.user_feedback (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    
+    -- Feedback target - what is being reviewed
+    target_type TEXT NOT NULL CHECK (target_type IN ('error_instance', 'categorization_result', 'assessment_result', 'taxonomy_category', 'system_suggestion')),
+    target_id UUID NOT NULL, -- References error, assessment, or categorization ID
+    
+    -- User information
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_role TEXT, -- Role at time of feedback
+    
+    -- Feedback classification
+    feedback_type TEXT NOT NULL CHECK (feedback_type IN ('quick_rating', 'detailed_form', 'category_correction', 'suggestion', 'effectiveness_rating')),
+    feedback_source TEXT DEFAULT 'manual' CHECK (feedback_source IN ('manual', 'prompted', 'workflow', 'automated')),
+    
+    -- Content
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5), -- 1-5 star rating
+    category_suggestion JSONB, -- Suggested MQM categorization changes
+    comment TEXT, -- Free text feedback
+    
+    -- Context and workflow
+    session_id UUID REFERENCES public.qa_sessions(id) ON DELETE SET NULL,
+    assessment_result_id UUID REFERENCES public.assessment_results(id) ON DELETE SET NULL,
+    original_categorization JSONB, -- Original error categorization
+    suggested_categorization JSONB, -- User's suggested categorization
+    
+    -- Metadata
+    confidence_level DECIMAL(3,2) DEFAULT 0.75 CHECK (confidence_level >= 0 AND confidence_level <= 1),
+    interaction_context JSONB DEFAULT '{}', -- UI context, workflow step, etc.
+    device_info JSONB DEFAULT '{}', -- Device/browser info for UX analysis
+    response_time_ms INTEGER, -- Time taken to provide feedback
+    
+    -- Status and workflow
+    status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'reviewed', 'implemented', 'rejected', 'pending')),
+    reviewed_by UUID REFERENCES public.profiles(id),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    review_notes TEXT,
+    
+    -- Effectiveness tracking
+    was_helpful BOOLEAN, -- Did this feedback improve the system?
+    implementation_date TIMESTAMP WITH TIME ZONE, -- When changes were applied
+    impact_score DECIMAL(3,2), -- Measured improvement from this feedback
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create feedback_metrics table for aggregated feedback analytics
+CREATE TABLE IF NOT EXISTS public.feedback_metrics (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    
+    -- Metrics scope
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    
+    -- Time period
+    period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+    period_type TEXT DEFAULT 'daily' CHECK (period_type IN ('hourly', 'daily', 'weekly', 'monthly')),
+    
+    -- Feedback volume metrics
+    total_feedback_count INTEGER DEFAULT 0,
+    quick_rating_count INTEGER DEFAULT 0,
+    detailed_feedback_count INTEGER DEFAULT 0,
+    category_correction_count INTEGER DEFAULT 0,
+    
+    -- Quality metrics
+    average_rating DECIMAL(3,2),
+    satisfaction_score DECIMAL(3,2), -- Overall user satisfaction
+    response_rate DECIMAL(3,2), -- % of prompts that received feedback
+    
+    -- Category feedback breakdown
+    category_feedback JSONB DEFAULT '{}', -- Feedback per MQM category
+    severity_feedback JSONB DEFAULT '{}', -- Feedback per severity level
+    
+    -- System improvement metrics
+    suggestions_implemented INTEGER DEFAULT 0,
+    average_implementation_time_days DECIMAL(5,2),
+    measured_improvements JSONB DEFAULT '{}', -- Tracked system improvements
+    
+    -- User engagement
+    unique_contributors INTEGER DEFAULT 0,
+    repeat_contributors INTEGER DEFAULT 0,
+    average_response_time_ms INTEGER,
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Ensure no overlapping periods for same scope
+    UNIQUE(organization_id, project_id, user_id, period_start, period_end, period_type)
+);
+
+-- Create feedback_learning table to track how feedback improves the system
+CREATE TABLE IF NOT EXISTS public.feedback_learning (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    
+    -- Learning source
+    feedback_id UUID REFERENCES public.user_feedback(id) ON DELETE CASCADE,
+    learning_type TEXT NOT NULL CHECK (learning_type IN ('pattern_recognition', 'categorization_rule', 'threshold_adjustment', 'ui_improvement', 'workflow_optimization')),
+    
+    -- What was learned
+    pattern_identified TEXT,
+    rule_changes JSONB DEFAULT '{}', -- Changes made to categorization rules
+    threshold_adjustments JSONB DEFAULT '{}', -- Confidence/severity threshold changes
+    ui_changes JSONB DEFAULT '{}', -- Interface improvements
+    
+    -- Implementation
+    implementation_status TEXT DEFAULT 'planned' CHECK (implementation_status IN ('planned', 'in_progress', 'implemented', 'tested', 'rolled_back')),
+    implemented_by UUID REFERENCES public.profiles(id),
+    implemented_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Impact measurement
+    baseline_metrics JSONB DEFAULT '{}', -- Metrics before change
+    post_implementation_metrics JSONB DEFAULT '{}', -- Metrics after change
+    improvement_percentage DECIMAL(5,2),
+    
+    -- Metadata
+    affected_components TEXT[], -- System components affected
+    confidence_score DECIMAL(3,2) DEFAULT 0.75, -- Confidence in this learning
+    metadata JSONB DEFAULT '{}',
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 -- Profiles table indexes
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
@@ -530,6 +663,33 @@ CREATE INDEX IF NOT EXISTS idx_qa_errors_session_id ON public.qa_errors(session_
 CREATE INDEX IF NOT EXISTS idx_qa_errors_severity ON public.qa_errors(severity);
 CREATE INDEX IF NOT EXISTS idx_file_uploads_session_id ON public.file_uploads(session_id);
 
+-- User feedback table indexes
+CREATE INDEX IF NOT EXISTS idx_user_feedback_target_type ON public.user_feedback(target_type);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_target_id ON public.user_feedback(target_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_user_id ON public.user_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_feedback_type ON public.user_feedback(feedback_type);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_id ON public.user_feedback(session_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_assessment_result_id ON public.user_feedback(assessment_result_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_status ON public.user_feedback(status);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_reviewed_by ON public.user_feedback(reviewed_by);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_created_at ON public.user_feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_rating ON public.user_feedback(rating);
+
+-- Feedback metrics table indexes
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_organization_id ON public.feedback_metrics(organization_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_project_id ON public.feedback_metrics(project_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_user_id ON public.feedback_metrics(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_period_type ON public.feedback_metrics(period_type);
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_period_start ON public.feedback_metrics(period_start);
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_period_end ON public.feedback_metrics(period_end);
+
+-- Feedback learning table indexes
+CREATE INDEX IF NOT EXISTS idx_feedback_learning_feedback_id ON public.feedback_learning(feedback_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_learning_learning_type ON public.feedback_learning(learning_type);
+CREATE INDEX IF NOT EXISTS idx_feedback_learning_implementation_status ON public.feedback_learning(implementation_status);
+CREATE INDEX IF NOT EXISTS idx_feedback_learning_implemented_by ON public.feedback_learning(implemented_by);
+CREATE INDEX IF NOT EXISTS idx_feedback_learning_implemented_at ON public.feedback_learning(implemented_at);
+
 -- High-Priority Composite Indexes for Performance Optimization
 
 -- Project dashboard queries (organization + status + priority)
@@ -586,6 +746,35 @@ WHERE severity = 'critical' AND status = 'open';
 CREATE INDEX IF NOT EXISTS idx_assessment_results_pending 
 ON public.assessment_results(assessor_id, submitted_at) 
 WHERE review_status = 'pending';
+
+-- User feedback composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_user_feedback_target_user_status 
+ON public.user_feedback(target_type, target_id, user_id, status);
+
+-- Feedback for specific sessions and users
+CREATE INDEX IF NOT EXISTS idx_user_feedback_session_user_type 
+ON public.user_feedback(session_id, user_id, feedback_type);
+
+-- Feedback analytics queries (organization + time period)
+CREATE INDEX IF NOT EXISTS idx_feedback_metrics_org_period 
+ON public.feedback_metrics(organization_id, period_type, period_start);
+
+-- Recent feedback requiring review
+CREATE INDEX IF NOT EXISTS idx_user_feedback_pending_review 
+ON public.user_feedback(reviewed_by, created_at) 
+WHERE status = 'submitted';
+
+-- High-value feedback (detailed with ratings)
+CREATE INDEX IF NOT EXISTS idx_user_feedback_detailed_rating 
+ON public.user_feedback(target_type, rating, created_at) 
+WHERE feedback_type = 'detailed_form' AND rating IS NOT NULL;
+
+-- JSONB indexes for feedback content searches
+CREATE INDEX IF NOT EXISTS idx_user_feedback_category_suggestion_gin 
+ON public.user_feedback USING gin(category_suggestion);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_interaction_context_gin 
+ON public.user_feedback USING gin(interaction_context);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -829,6 +1018,97 @@ CREATE POLICY "Users can view assessment comparisons" ON public.assessment_compa
 CREATE POLICY "Users can create assessment comparisons" ON public.assessment_comparisons
     FOR INSERT WITH CHECK (created_by = auth.uid());
 
+-- Enable RLS on feedback tables
+ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback_learning ENABLE ROW LEVEL SECURITY;
+
+-- User Feedback: Users can view and create their own feedback, admins can view all
+CREATE POLICY "Users can view own feedback" ON public.user_feedback
+    FOR SELECT USING (
+        user_id = auth.uid()
+        OR reviewed_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+CREATE POLICY "Users can create feedback" ON public.user_feedback
+    FOR INSERT WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own feedback" ON public.user_feedback
+    FOR UPDATE USING (
+        user_id = auth.uid()
+        OR reviewed_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+-- Feedback Metrics: Users can view metrics for their org/projects, admins can view all
+CREATE POLICY "Users can view feedback metrics" ON public.feedback_metrics
+    FOR SELECT USING (
+        user_id = auth.uid()
+        OR organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE profiles.id = auth.uid()
+        )
+        OR project_id IN (
+            SELECT projects.id FROM public.projects
+            JOIN public.project_members ON projects.id = project_members.project_id
+            WHERE project_members.user_id = auth.uid()
+        )
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+CREATE POLICY "Admins can create feedback metrics" ON public.feedback_metrics
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+-- Feedback Learning: Admins and managers can access learning data
+CREATE POLICY "Admins can view feedback learning" ON public.feedback_learning
+    FOR SELECT USING (
+        implemented_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+CREATE POLICY "Admins can create feedback learning" ON public.feedback_learning
+    FOR INSERT WITH CHECK (
+        implemented_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
+CREATE POLICY "Admins can update feedback learning" ON public.feedback_learning
+    FOR UPDATE USING (
+        implemented_by = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE profiles.id = auth.uid() 
+            AND profiles.role IN ('admin', 'manager')
+        )
+    );
+
 -- Create functions for automatic timestamp updates
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
@@ -871,6 +1151,19 @@ CREATE TRIGGER assessment_templates_updated_at
 
 CREATE TRIGGER assessment_results_updated_at 
     BEFORE UPDATE ON public.assessment_results
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Feedback-related triggers
+CREATE TRIGGER user_feedback_updated_at 
+    BEFORE UPDATE ON public.user_feedback
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER feedback_metrics_updated_at 
+    BEFORE UPDATE ON public.feedback_metrics
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER feedback_learning_updated_at 
+    BEFORE UPDATE ON public.feedback_learning
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Create function to automatically create user profile

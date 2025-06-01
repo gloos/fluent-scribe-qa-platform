@@ -1,91 +1,186 @@
 /**
- * Batch Processing System
- * Handles queue management and batch processing of XLIFF files
+ * Batch Processing Library
+ * 
+ * Comprehensive batch file processing system with intelligent parallel processing,
+ * queue management, and performance optimization.
  */
 
-// Core types and interfaces
+// Export all batch processing types
 export * from './types'
 
-// Queue management
-export { 
-  BatchProcessingQueue, 
-  processingQueue 
-} from './queue'
+// Export core processing components
+export { BatchProcessingQueue } from './queue'
 
-// Batch processor
-export { 
-  BatchProcessor, 
-  batchProcessor,
-  type ProcessorOptions 
-} from './processor'
+// Export results aggregation system
+export { BatchResultsAggregator, resultsAggregator } from './results-aggregator'
+export { BatchResultsStorage, defaultLocalStorage as resultsStorage } from './results-storage'
+export { BatchResultsAnalytics, resultsAnalytics } from './results-analytics'
+export { BatchResultsExporter, resultsExporter } from './results-exporter'
+export { BatchResultsDistributor, resultsDistributor } from './results-distributor'
 
-// Convenience exports for common operations
-export {
-  JobPriority,
-  DEFAULT_QUEUE_CONFIG,
-  JOB_TEMPLATES
-} from './types'
-
-// Main API for easy usage
-import { batchProcessor } from './processor'
-import { processingQueue } from './queue'
+// Import instances for the manager
+import { resultsAggregator } from './results-aggregator'
+import { defaultLocalStorage } from './results-storage'
+import { resultsAnalytics } from './results-analytics'
+import { resultsExporter } from './results-exporter'
+import { resultsDistributor } from './results-distributor'
 
 /**
- * Main Batch Processing API
- * Provides a simplified interface for common batch operations
+ * Comprehensive batch results management system
+ * Provides unified access to aggregation, storage, analytics, export, and distribution
  */
-export const batchAPI = {
-  // Queue operations
-  queue: processingQueue,
-  
-  // Processor operations  
-  processor: batchProcessor,
+export class BatchResultsManager {
+  constructor(
+    public aggregator = resultsAggregator,
+    public storage = defaultLocalStorage,
+    public analytics = resultsAnalytics,
+    public exporter = resultsExporter,
+    public distributor = resultsDistributor
+  ) {}
 
-  // Convenience methods
-  async processFiles(files: File[], config = {}) {
-    return batchProcessor.processFiles(files, config)
-  },
+  /**
+   * Initialize the results management system
+   */
+  async initialize(): Promise<void> {
+    // Initialize storage adapters
+    await this.storage.initialize()
+    
+    // Set up real-time aggregation
+    this.aggregator.startRealTimeAggregation()
+    
+    // Connect aggregator to storage for automatic persistence
+    this.aggregator.onResultAggregated(async (result) => {
+      await this.storage.store(result)
+      
+      // Trigger distribution to configured channels
+      await this.distributor.distribute(result)
+    })
+    
+    console.log('📊 Batch Results Management System initialized')
+  }
 
-  async createBatch(name: string, files: File[], config = {}) {
-    return batchProcessor.processBatch(name, files, config)
-  },
+  /**
+   * Process and store results for a completed batch
+   */
+  async processBatchResults(
+    jobs: Array<{ id: string; result: any }>,
+    batchId?: string
+  ): Promise<string> {
+    // Aggregate results from all jobs in the batch
+    const aggregatedResult = await this.aggregator.aggregateByJobs(
+      jobs.map(job => job.id),
+      batchId
+    )
 
-  start() {
-    batchProcessor.start()
-  },
+    // Store the aggregated result
+    await this.storage.store(aggregatedResult)
 
-  stop() {
-    batchProcessor.stop()
-  },
+    // Distribute to configured channels
+    await this.distributor.distribute(aggregatedResult)
 
-  getStats() {
-    return batchProcessor.getStats()
-  },
+    return aggregatedResult.id
+  }
 
-  getJobs(filter?: any) {
-    return batchProcessor.getJobs(filter)
-  },
+  /**
+   * Get comprehensive analytics for a time period
+   */
+  async getAnalytics(timeWindowMs: number = 86400000): Promise<any> {
+    const endTime = Date.now()
+    const startTime = endTime - timeWindowMs
 
-  getJob(jobId: string) {
-    return batchProcessor.getJob(jobId)
-  },
+    const results = await this.storage.query({
+      timeRange: { start: startTime, end: endTime }
+    })
 
-  getBatches() {
-    return batchProcessor.getBatches()
-  },
+    return {
+      trends: await this.analytics.analyzeTrends(results, timeWindowMs),
+      benchmarks: this.analytics.generateBenchmarks(results),
+      anomalies: this.analytics.detectAnomalies(results),
+      summary: {
+        totalResults: results.length,
+        averageQuality: results.reduce((sum, r) => sum + (r.qualityMetrics.overallScore || 0), 0) / results.length,
+        totalFiles: results.reduce((sum, r) => sum + r.fileAnalysis.totalFiles, 0),
+        totalSegments: results.reduce((sum, r) => sum + r.fileAnalysis.totalSegments, 0)
+      }
+    }
+  }
 
-  getBatch(batchId: string) {
-    return batchProcessor.getBatch(batchId)
-  },
+  /**
+   * Export results in various formats
+   */
+  async exportResults(
+    query: any,
+    format: 'json' | 'csv' | 'excel' | 'pdf' = 'json'
+  ): Promise<{ success: boolean; data?: Blob | string; error?: string }> {
+    const results = await this.storage.query(query)
+    
+    if (results.length === 0) {
+      return { success: false, error: 'No results found for the given query' }
+    }
 
-  cancelJob(jobId: string) {
-    return batchProcessor.cancelJob(jobId)
-  },
+    // For multiple results, aggregate them first
+    let dataToExport
+    if (results.length === 1) {
+      dataToExport = results[0]
+    } else {
+      // Create a summary aggregation
+      dataToExport = await this.aggregator.aggregateByResults(results, 'export-summary')
+    }
 
-  retryJob(jobId: string) {
-    return batchProcessor.retryJob(jobId)
+    return this.exporter.export(dataToExport, {
+      format: format as any,
+      filename: `results-export-${Date.now()}.${format}`
+    })
+  }
+
+  /**
+   * Set up distribution channels
+   */
+  configureDistribution(channels: any[]): void {
+    channels.forEach(channel => {
+      this.distributor.registerChannel(channel)
+    })
+  }
+
+  /**
+   * Get system health and metrics
+   */
+  getSystemHealth(): {
+    aggregator: any
+    storage: any
+    distributor: any
+    analytics: boolean
+  } {
+    return {
+      aggregator: this.aggregator.getMetrics(),
+      storage: this.storage.getMetrics(),
+      distributor: this.distributor.getMetrics(),
+      analytics: true // Analytics is stateless
+    }
+  }
+
+  /**
+   * Cleanup old data based on retention policies
+   */
+  async cleanup(): Promise<void> {
+    await this.storage.cleanup()
+    console.log('🧹 Batch results cleanup completed')
+  }
+
+  /**
+   * Shutdown the system gracefully
+   */
+  async shutdown(): Promise<void> {
+    this.aggregator.stopRealTimeAggregation()
+    await this.storage.cleanup()
+    console.log('⏹️ Batch Results Management System shutdown')
   }
 }
 
-// Default export
-export default batchAPI 
+// Create and export singleton instance
+export const batchResultsManager = new BatchResultsManager()
+
+// Auto-initialize on import (can be disabled by setting env var)
+if (typeof window !== 'undefined' && !process.env.DISABLE_AUTO_INIT) {
+  batchResultsManager.initialize().catch(console.error)
+} 

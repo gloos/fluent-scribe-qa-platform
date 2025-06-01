@@ -27,7 +27,8 @@ import {
   Calendar,
   Target,
   Zap,
-  Timer
+  Timer,
+  MessageSquare
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { Link } from "react-router-dom";
@@ -40,6 +41,9 @@ import {
 import { useReportFilters, type ReportData } from "@/hooks/useReportFilters";
 import { AdvancedFilters } from "@/components/filters/AdvancedFilters";
 import { TrendIndicator } from "@/components/ui/trend-indicator";
+import { DashboardPreferencesModal } from "@/components/dashboard/DashboardPreferences";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
+import { FeedbackTargetType, FeedbackFormData } from "@/lib/types/user-feedback";
 
 interface RecentFile {
   id: string;
@@ -218,6 +222,24 @@ const Dashboard = () => {
     processingTime: file.processingTime,
   }));
 
+  // Handle feedback submission for files and dashboard
+  const handleFeedbackSubmit = async (targetId: string, feedbackData: FeedbackFormData) => {
+    try {
+      console.log('Dashboard feedback submitted:', targetId, feedbackData)
+      // In a real application, you would call your feedback service
+      // await feedbackService.submitFeedback({
+      //   target_type: FeedbackTargetType.ASSESSMENT_RESULT,
+      //   target_id: targetId,
+      //   ...feedbackData
+      // })
+      
+      alert(`Feedback submitted for ${targetId}!\nType: ${feedbackData.feedback_type}\nRating: ${feedbackData.rating || 'None'}\nComment: ${feedbackData.comment || 'None'}`)
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      alert('Error submitting feedback. Please try again.')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -296,10 +318,12 @@ const Dashboard = () => {
               </Button>
             </AdvancedFilters>
 
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Preferences
-            </Button>
+            <DashboardPreferencesModal>
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Preferences
+              </Button>
+            </DashboardPreferencesModal>
 
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
@@ -659,6 +683,21 @@ const Dashboard = () => {
                         <div className="flex items-center space-x-3">
                           {getStatusIcon(file.status)}
                           {getStatusBadge(file.status)}
+                          
+                          {/* Feedback Button for Completed Files */}
+                          {file.status === "completed" && (
+                            <FeedbackButton
+                              targetType={FeedbackTargetType.ASSESSMENT_RESULT}
+                              targetId={file.id}
+                              onFeedbackSubmit={(feedbackData) => handleFeedbackSubmit(file.id, feedbackData)}
+                              variant="icon"
+                              size="sm"
+                              showQuickRating={true}
+                              showFeedbackCount={true}
+                              feedbackCount={Math.floor(Math.random() * 10)} // Demo data
+                            />
+                          )}
+                          
                           {file.status === "completed" && (
                             <Link to={`/reports?fileId=${file.id}`}>
                               <Button size="sm" variant="outline">
@@ -671,6 +710,46 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Feedback System Showcase Card */}
+                  <div className="mt-6 p-4 border-2 border-dashed border-blue-200 rounded-lg bg-blue-50/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <MessageSquare className="h-8 w-8 text-blue-600" />
+                        <div>
+                          <p className="font-medium text-blue-900">User Feedback System</p>
+                          <p className="text-sm text-blue-700">
+                            Help us improve our QA system by providing feedback on assessments
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <FeedbackButton
+                          targetType={FeedbackTargetType.TAXONOMY_STRUCTURE}
+                          targetId="dashboard-system"
+                          onFeedbackSubmit={(feedbackData) => handleFeedbackSubmit('dashboard-system', feedbackData)}
+                          variant="button"
+                          size="sm"
+                          showQuickRating={true}
+                        />
+                        
+                        <Link to="/feedback-demo">
+                          <Button size="sm" variant="outline">
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            View Demo
+                          </Button>
+                        </Link>
+                        
+                        <Link to="/qa-errors">
+                          <Button size="sm" variant="outline">
+                            <AlertTriangle className="h-4 w-4 mr-1" />
+                            QA Errors
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

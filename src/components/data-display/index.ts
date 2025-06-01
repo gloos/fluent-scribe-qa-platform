@@ -22,8 +22,10 @@ export {
 // Error Display
 export { 
   ErrorList,
+  ErrorCard,
   ErrorSummary,
-  type QAError 
+  type QAError,
+  type ErrorCardProps 
 } from './ErrorList'
 
 // Score Display

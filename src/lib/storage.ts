@@ -23,6 +23,19 @@ export const storageConfig = {
   maxFileSize: 50 * 1024 * 1024 // 50MB
 }
 
+// Helper function to get the correct MIME type for XLIFF files
+const getCorrectMimeType = (file: File, fileExtension: string): string => {
+  // Map of file extensions to their correct MIME types
+  const mimeTypeMap: Record<string, string> = {
+    'xliff': 'application/xliff+xml',
+    'xlf': 'application/xliff+xml', 
+    'mxliff': 'application/xliff+xml'
+  }
+
+  // Return the correct MIME type based on extension, fallback to file.type
+  return mimeTypeMap[fileExtension] || file.type || 'application/xliff+xml'
+}
+
 export const uploadFile = async (
   file: File,
   bucket: string = storageConfig.buckets.qaFiles,
@@ -50,15 +63,27 @@ export const uploadFile = async (
     const fileName = `${timestamp}_${randomId}_${file.name}`
     const filePath = folder ? `${folder}/${fileName}` : fileName
 
-    // Upload file
+    // Get the correct MIME type for the file
+    const correctMimeType = getCorrectMimeType(file, fileExtension)
+
+    // Create a new File object with the correct MIME type if needed
+    const fileToUpload = file.type === 'application/octet-stream' || !file.type 
+      ? new File([file], file.name, { type: correctMimeType })
+      : file
+
+    console.log(`Uploading file with MIME type: ${fileToUpload.type}`)
+
+    // Upload file with explicit content type
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(filePath, file, {
+      .upload(filePath, fileToUpload, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: correctMimeType
       })
 
     if (error) {
+      console.error('Supabase upload error:', error)
       return { error }
     }
 
@@ -75,6 +100,7 @@ export const uploadFile = async (
       }
     }
   } catch (error) {
+    console.error('Upload catch error:', error)
     return {
       error: error instanceof Error ? error : new Error('Unknown upload error')
     }

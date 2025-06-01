@@ -210,3 +210,56 @@
     background-color: hsl(var(--translation-error));
   }
 }
+
+/* Progress tracking animations */
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      opacity: 0.6;
+      transform: translateX(-100%);
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.6;
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes upload-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes queue-bounce {
+    0%, 20%, 53%, 80%, 100% {
+      transform: translate3d(0, 0, 0);
+    }
+    40%, 43% {
+      transform: translate3d(0, -8px, 0);
+    }
+    70% {
+      transform: translate3d(0, -4px, 0);
+    }
+    90% {
+      transform: translate3d(0, -2px, 0);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  .animate-upload-pulse {
+    animation: upload-pulse 2s ease-in-out infinite;
+  }
+
+  .animate-queue-bounce {
+    animation: queue-bounce 1.2s ease-in-out infinite;
+  }
+}

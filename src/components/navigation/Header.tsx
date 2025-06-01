@@ -31,7 +31,9 @@ import {
   BarChart3, 
   Upload,
   Zap,
-  ChevronDown
+  ChevronDown,
+  MessageSquare,
+  AlertTriangle
 } from 'lucide-react'
 
 interface HeaderProps {
@@ -57,7 +59,7 @@ interface NavigationItem {
 const navigationItems: NavigationItem[] = [
   {
     title: 'Dashboard',
-    href: '/',
+    href: '/dashboard',
     description: 'Overview of your QA sessions and metrics',
     icon: <BarChart3 className="h-4 w-4" />
   },
@@ -81,6 +83,11 @@ const navigationItems: NavigationItem[] = [
         title: 'Completed',
         href: '/sessions?status=completed',
         description: 'Finished analysis sessions'
+      },
+      {
+        title: 'QA Error Analysis',
+        href: '/qa-errors',
+        description: 'Review errors with feedback system'
       }
     ]
   },
@@ -112,6 +119,13 @@ const navigationItems: NavigationItem[] = [
         description: 'Processing time and efficiency'
       }
     ]
+  },
+  {
+    title: 'Feedback',
+    href: '/feedback-demo',
+    description: 'User feedback system demonstration',
+    icon: <MessageSquare className="h-4 w-4" />,
+    badge: 'New'
   }
 ]
 
@@ -124,8 +138,8 @@ export const Header: React.FC<HeaderProps> = ({
   const location = useLocation()
 
   const isActivePath = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/'
+    if (href === '/' || href === '/dashboard') {
+      return location.pathname === '/' || location.pathname === '/dashboard'
     }
     return location.pathname.startsWith(href)
   }

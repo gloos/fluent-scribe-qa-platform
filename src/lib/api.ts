@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { QASession, QAError } from './supabase'
+import { QASession, QAError } from './types/qa-session'
 
 // User Profile Operations
 export const getUserProfile = async (userId: string) => {

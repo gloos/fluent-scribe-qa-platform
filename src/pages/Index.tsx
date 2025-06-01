@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, BarChart3, Shield, CreditCard, Zap } from "lucide-react";
+import { Upload, FileText, BarChart3, Shield, CreditCard, Zap, MessageSquare } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -38,46 +37,88 @@ const Index = () => {
       </section>
 
       {/* Features Section */}
-      <section className="px-6 py-16 bg-white">
+      <section className="px-6 py-16">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Powerful Features for Translation Quality
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
-                <CardTitle className="text-xl">XLIFF Support</CardTitle>
-                <CardDescription>
-                  Upload XLIFF 1.2, 2.0, or MXLIFF files for comprehensive analysis
-                </CardDescription>
+          <h2 className="text-3xl font-bold text-center mb-12">Platform Features</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Upload className="h-12 w-12 text-blue-600 mb-4" />
+                <CardTitle>XLIFF Upload & Processing</CardTitle>
               </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Seamlessly upload and process XLIFF files with advanced AI-powered linguistic analysis and quality assessment.
+                </CardDescription>
+              </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Zap className="h-6 w-6 text-green-600" />
-                </div>
-                <CardTitle className="text-xl">AI-Powered Analysis</CardTitle>
-                <CardDescription>
-                  Advanced LLM processing for accurate linguistic quality assessment
-                </CardDescription>
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <BarChart3 className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>Comprehensive Analytics</CardTitle>
               </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Get detailed quality metrics, error analysis, and performance insights with visual dashboards and reporting.
+                </CardDescription>
+              </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader className="text-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <BarChart3 className="h-6 w-6 text-purple-600" />
-                </div>
-                <CardTitle className="text-xl">Detailed Reports</CardTitle>
-                <CardDescription>
-                  Interactive dashboards with filtering and comprehensive scoring
-                </CardDescription>
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Shield className="h-12 w-12 text-purple-600 mb-4" />
+                <CardTitle>Enterprise Security</CardTitle>
               </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Enterprise-grade security with encrypted file handling, secure processing, and comprehensive audit trails.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <FileText className="h-12 w-12 text-orange-600 mb-4" />
+                <CardTitle>Detailed Reporting</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Generate comprehensive quality assessment reports with MQM scoring and detailed error categorization.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <MessageSquare className="h-12 w-12 text-pink-600 mb-4" />
+                <CardTitle>User Feedback System</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Continuous improvement through integrated feedback collection on error categorization and assessment quality.
+                </CardDescription>
+                <div className="mt-4">
+                  <Link to="/feedback-demo">
+                    <Button size="sm" variant="outline" className="w-full">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Try Feedback Demo
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Zap className="h-12 w-12 text-yellow-600 mb-4" />
+                <CardTitle>Fast Processing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Lightning-fast analysis powered by optimized AI models for quick turnaround on quality assessments.
+                </CardDescription>
+              </CardContent>
             </Card>
           </div>
         </div>
