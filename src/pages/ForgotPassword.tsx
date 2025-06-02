@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { FileText, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { FileText, Mail, ArrowLeft, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,12 @@ const ForgotPassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    limited: boolean;
+    retryAfter?: number;
+    captchaRequired?: boolean;
+    suspiciousActivity?: boolean;
+  } | null>(null);
 
   // Email validation
   const validateEmail = (email: string): boolean => {
@@ -34,6 +40,19 @@ const ForgotPassword = () => {
     return true;
   };
 
+  // Format wait time in a user-friendly way
+  const formatWaitTime = (waitTimeMs?: number): string => {
+    if (!waitTimeMs) return '';
+    
+    const minutes = Math.ceil(waitTimeMs / (1000 * 60));
+    if (minutes < 60) {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+    
+    const hours = Math.ceil(minutes / 60);
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -42,14 +61,32 @@ const ForgotPassword = () => {
     }
 
     setIsSubmitting(true);
+    setRateLimitInfo(null);
 
     try {
-      const { error } = await resetPassword(email);
+      const result = await resetPassword(email);
 
-      if (error) {
+      if (!result.success) {
+        if (result.rateLimited) {
+          const waitTime = formatWaitTime(result.retryAfter);
+          setRateLimitInfo({
+            limited: true,
+            retryAfter: result.retryAfter,
+            captchaRequired: result.captchaRequired,
+            suspiciousActivity: result.suspiciousActivity
+          });
+
+          toast({
+            title: "Rate Limit Exceeded",
+            description: `Please wait ${waitTime} before requesting another password reset.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
         toast({
           title: "Reset Failed",
-          description: error.message,
+          description: result.error?.message || "Failed to send reset email",
           variant: "destructive",
         });
         return;
@@ -75,9 +112,12 @@ const ForgotPassword = () => {
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
     
-    // Clear validation error when user starts typing
+    // Clear validation error and rate limit info when user starts typing
     if (validationError) {
       setValidationError("");
+    }
+    if (rateLimitInfo) {
+      setRateLimitInfo(null);
     }
   };
 
@@ -171,6 +211,29 @@ const ForgotPassword = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Rate limit warning */}
+            {rateLimitInfo?.limited && (
+              <Alert className="mb-4" variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-1">
+                    <p>Too many password reset requests.</p>
+                    {rateLimitInfo.retryAfter && (
+                      <p className="text-sm">
+                        Please wait {formatWaitTime(rateLimitInfo.retryAfter)} before trying again.
+                      </p>
+                    )}
+                    {rateLimitInfo.captchaRequired && (
+                      <p className="text-sm">Additional verification may be required for your next attempt.</p>
+                    )}
+                    {rateLimitInfo.suspiciousActivity && (
+                      <p className="text-sm">Suspicious activity detected. Please contact support if you need assistance.</p>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -194,14 +257,27 @@ const ForgotPassword = () => {
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Sending reset email..." : "Send reset email"}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isSubmitting || rateLimitInfo?.limited}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Sending reset email...
+                  </>
+                ) : rateLimitInfo?.limited ? (
+                  "Please wait before trying again"
+                ) : (
+                  "Send reset email"
+                )}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
-              <Link to="/login" className="inline-flex items-center text-sm text-blue-600 hover:text-blue-500 font-medium">
-                <ArrowLeft className="h-4 w-4 mr-1" />
+              <Link to="/login" className="text-sm text-blue-600 hover:text-blue-500">
+                <ArrowLeft className="inline h-4 w-4 mr-1" />
                 Back to sign in
               </Link>
             </div>

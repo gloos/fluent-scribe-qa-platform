@@ -152,6 +152,9 @@ export interface UserProfile {
   // Security fields
   password_changed_at?: string;
   two_factor_enabled: boolean;
+  two_factor_secret?: string;
+  two_factor_method?: 'totp' | 'sms' | 'email';
+  two_factor_backup_codes?: string; // JSON string
   backup_codes_generated_at?: string;
   failed_login_attempts: number;
   locked_until?: string;

@@ -1,4 +1,7 @@
 import { supabase } from './supabase';
+import { passwordResetRateLimiter } from './security/PasswordResetRateLimiter'
+import type { AuthError } from '@supabase/supabase-js'
+import { getCachedClientInfo } from './utils/clientInfo'
 
 export interface LoginAttemptResult {
   success: boolean;
@@ -320,4 +323,109 @@ export class AuthService {
   }
 }
 
-export const authService = new AuthService(); 
+export const authService = new AuthService();
+
+/**
+ * Enhanced password reset result with rate limiting information
+ */
+export interface PasswordResetResult {
+  success: boolean
+  error?: AuthError | null
+  rateLimited?: boolean
+  retryAfter?: number
+  captchaRequired?: boolean
+  suspiciousActivity?: boolean
+}
+
+/**
+ * Secure password reset with comprehensive rate limiting and security measures
+ */
+export const securePasswordReset = async (
+  email: string, 
+  ipAddress?: string
+): Promise<PasswordResetResult> => {
+  try {
+    // Get client information if IP not provided
+    let clientIP = ipAddress;
+    if (!clientIP) {
+      try {
+        const clientInfo = await getCachedClientInfo();
+        clientIP = clientInfo.ipAddress;
+      } catch (error) {
+        console.warn('Failed to get client info, using fallback:', error);
+        clientIP = 'unknown';
+      }
+    }
+    
+    // Check rate limiting
+    const rateLimitResult = await passwordResetRateLimiter.checkResetRequest(email, clientIP);
+    
+    if (!rateLimitResult.allowed) {
+      return {
+        success: false,
+        error: {
+          message: rateLimitResult.reason || 'Rate limit exceeded. Please try again later.'
+        } as AuthError,
+        rateLimited: true,
+        retryAfter: rateLimitResult.waitTime,
+        captchaRequired: rateLimitResult.needsCaptcha,
+        suspiciousActivity: rateLimitResult.metadata?.isSuspicious
+      }
+    }
+
+    // Proceed with password reset
+    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
+    const redirectUrl = `${baseUrl}/auth/reset-password`
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl
+    })
+
+    if (error) {
+      // Record failed attempt
+      await passwordResetRateLimiter.recordFailedReset(email, clientIP, 'unknown', error.message)
+      
+      return {
+        success: false,
+        error,
+        rateLimited: false
+      }
+    }
+
+    // Record successful attempt
+    await passwordResetRateLimiter.recordResetRequest(email, clientIP)
+    
+    return {
+      success: true,
+      rateLimited: false
+    }
+
+  } catch (error) {
+    console.error('Secure password reset error:', error)
+    
+    return {
+      success: false,
+      error: error as AuthError,
+      rateLimited: false
+    }
+  }
+}
+
+/**
+ * Check password reset rate limit status for user feedback
+ */
+export const checkPasswordResetStatus = async (email: string, ipAddress?: string) => {
+  // Get client information if IP not provided
+  let clientIP = ipAddress;
+  if (!clientIP) {
+    try {
+      const clientInfo = await getCachedClientInfo();
+      clientIP = clientInfo.ipAddress;
+    } catch (error) {
+      console.warn('Failed to get client info for status check:', error);
+      clientIP = 'unknown';
+    }
+  }
+  
+  return await passwordResetRateLimiter.checkResetRequest(email, clientIP)
+} 

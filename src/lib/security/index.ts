@@ -4,6 +4,8 @@ export * from './DeviceFingerprinting';
 export * from './SecurityLogger';
 export * from './PasswordSecurityService';
 export * from './SecurityHeaders';
+export * from './EnhancedSessionManager';
+export * from './SessionComplexityAnalyzer';
 
 // Import modules for unified service
 import { sessionManager, SessionManager } from '../sessionManager'; // Use consolidated session manager
@@ -11,6 +13,8 @@ import { DeviceFingerprinting } from './DeviceFingerprinting';
 import { SecurityLogger } from './SecurityLogger';
 import { PasswordSecurityService } from './PasswordSecurityService';
 import { SecurityHeaders } from './SecurityHeaders';
+import { enhancedSessionManager } from './EnhancedSessionManager';
+import { sessionComplexityAnalyzer } from './SessionComplexityAnalyzer';
 import type { SecurityEvent as SecurityEventType } from './types';
 
 /**
@@ -84,6 +88,44 @@ export class SecurityService {
 
   public clearRateLimit(identifier: string) {
     return this.sessionManager.clearRateLimit(identifier);
+  }
+
+  // Enhanced Session Management Methods
+  public async validateSessionWithSecurity(userId?: string) {
+    return enhancedSessionManager.validateSessionWithSecurity(userId);
+  }
+
+  public async enhancedSecureLogout(userId?: string, reason?: string) {
+    return enhancedSessionManager.enhancedSecureLogout(userId, reason);
+  }
+
+  public async getEnhancedSessionInfo(userId?: string) {
+    return enhancedSessionManager.getEnhancedSessionInfo(userId);
+  }
+
+  public getSessionSecurityAnalysis() {
+    return enhancedSessionManager.getSessionSecurityAnalysis();
+  }
+
+  public configureEnhancedSession(config: any) {
+    return enhancedSessionManager.configureEnhanced(config);
+  }
+
+  // Session Complexity Analysis Methods
+  public async analyzeSessionComplexity(userId?: string) {
+    return sessionComplexityAnalyzer.analyzeSessionComplexity(userId);
+  }
+
+  public async analyzeSessionPatterns(userId?: string) {
+    return sessionComplexityAnalyzer.analyzeSessionPatterns(userId);
+  }
+
+  public getComplexityMetrics() {
+    return sessionComplexityAnalyzer.getComplexityMetrics();
+  }
+
+  public clearAnalysisCaches() {
+    return sessionComplexityAnalyzer.clearCaches();
   }
 
   // Device Fingerprinting Methods
@@ -187,6 +229,9 @@ if (typeof window !== 'undefined') {
 export { sessionManager } from '../sessionManager';
 export const deviceFingerprinting = new DeviceFingerprinting();
 export const securityLogger = new SecurityLogger();
+
+// Export the enhanced session services
+export { enhancedSessionManager, sessionComplexityAnalyzer };
 
 // Re-export the static classes
 export { PasswordSecurityService, SecurityHeaders }; 

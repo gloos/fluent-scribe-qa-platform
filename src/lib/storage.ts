@@ -37,13 +37,60 @@ const getCorrectMimeType = (file: File, fileExtension: string): string => {
 }
 
 export const uploadFile = async (
-  file: File,
+  file: File | Blob,
   bucket: string = storageConfig.buckets.qaFiles,
-  folder: string = ''
+  folder: string = '',
+  fileName?: string
 ): Promise<UploadResult> => {
   try {
-    // Validate file type
-    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    // Handle blob uploads (for chunks)
+    if (file instanceof Blob && !(file instanceof File)) {
+      if (!fileName) {
+        return {
+          error: new Error('fileName is required when uploading Blob objects')
+        }
+      }
+
+      // Generate unique filename for blob
+      const timestamp = Date.now()
+      const randomId = Math.random().toString(36).substring(2)
+      const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const fullFileName = `${timestamp}_${randomId}_${sanitizedName}`
+      const filePath = folder ? `${folder}/${fullFileName}` : fullFileName
+
+      // Upload blob with binary content type
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'application/octet-stream'
+        })
+
+      if (error) {
+        console.error('Supabase blob upload error:', error)
+        return { error }
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath)
+
+      return {
+        data: {
+          path: data.path,
+          fullPath: data.fullPath,
+          publicUrl
+        }
+      }
+    }
+
+    // Handle regular file uploads
+    const fileObj = file as File
+    
+    // Validate file type for XLIFF files
+    const fileExtension = fileObj.name.split('.').pop()?.toLowerCase()
     if (!fileExtension || !Object.keys(storageConfig.allowedFileTypes).includes(fileExtension)) {
       return {
         error: new Error(`File type .${fileExtension} is not supported. Supported types: ${Object.keys(storageConfig.allowedFileTypes).join(', ')}`)
@@ -51,7 +98,7 @@ export const uploadFile = async (
     }
 
     // Validate file size
-    if (file.size > storageConfig.maxFileSize) {
+    if (fileObj.size > storageConfig.maxFileSize) {
       return {
         error: new Error(`File size exceeds maximum limit of ${storageConfig.maxFileSize / (1024 * 1024)}MB`)
       }
@@ -60,16 +107,18 @@ export const uploadFile = async (
     // Generate unique filename
     const timestamp = Date.now()
     const randomId = Math.random().toString(36).substring(2)
-    const fileName = `${timestamp}_${randomId}_${file.name}`
-    const filePath = folder ? `${folder}/${fileName}` : fileName
+    const finalFileName = fileName || fileObj.name
+    const sanitizedName = finalFileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const fullFileName = `${timestamp}_${randomId}_${sanitizedName}`
+    const filePath = folder ? `${folder}/${fullFileName}` : fullFileName
 
     // Get the correct MIME type for the file
-    const correctMimeType = getCorrectMimeType(file, fileExtension)
+    const correctMimeType = getCorrectMimeType(fileObj, fileExtension)
 
     // Create a new File object with the correct MIME type if needed
-    const fileToUpload = file.type === 'application/octet-stream' || !file.type 
-      ? new File([file], file.name, { type: correctMimeType })
-      : file
+    const fileToUpload = fileObj.type === 'application/octet-stream' || !fileObj.type 
+      ? new File([fileObj], fileObj.name, { type: correctMimeType })
+      : fileObj
 
     console.log(`Uploading file with MIME type: ${fileToUpload.type}`)
 
@@ -103,6 +152,26 @@ export const uploadFile = async (
     console.error('Upload catch error:', error)
     return {
       error: error instanceof Error ? error : new Error('Unknown upload error')
+    }
+  }
+}
+
+/**
+ * Specialized function for uploading file chunks
+ */
+export const uploadChunk = async (
+  chunkBlob: Blob,
+  chunkId: string,
+  bucket: string = storageConfig.buckets.qaFiles,
+  folder: string = 'chunks'
+): Promise<UploadResult> => {
+  try {
+    const chunkFileName = `${chunkId}.chunk`
+    return await uploadFile(chunkBlob, bucket, folder, chunkFileName)
+  } catch (error) {
+    console.error('Chunk upload error:', error)
+    return {
+      error: error instanceof Error ? error : new Error('Unknown chunk upload error')
     }
   }
 }

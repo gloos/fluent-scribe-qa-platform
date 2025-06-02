@@ -327,16 +327,24 @@ export class ApiAuthMiddleware {
   }
 
   /**
-   * Add security headers to responses
+   * Add additional security headers to responses (supplementing helmet configuration)
    */
   static securityHeaders() {
     return (req: Request, res: Response, next: NextFunction) => {
+      // Additional security headers not covered by helmet or with custom values
       res.set({
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'X-XSS-Protection': '1; mode=block',
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-        'Referrer-Policy': 'strict-origin-when-cross-origin'
+        // Custom response time header for API monitoring
+        'X-Response-Time': `${Date.now() - (req as any).startTime || 0}ms`,
+        
+        // Clear server information
+        'Server': '', // Override any server headers
+        
+        // Additional security headers for API context
+        'X-API-Version': '1.0.0',
+        'X-Rate-Limit-Policy': 'per-user-per-hour',
+        
+        // Content-Type enforcement for API responses
+        'X-Content-Type-Validation': 'strict'
       });
 
       next();

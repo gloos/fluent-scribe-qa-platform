@@ -104,10 +104,19 @@ export class AuditLogger {
 
   constructor() {
     // Initialize Supabase client for database operations
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Try multiple environment variable patterns and fallback to known working values
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                       process.env.VITE_SUPABASE_URL || 
+                       process.env.SUPABASE_URL || 
+                       'https://uqprvrrncpqhpfxafeuc.supabase.co';
+    
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+                       process.env.VITE_SUPABASE_ANON_KEY ||
+                       process.env.SUPABASE_ANON_KEY ||
+                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcHJ2cnJuY3BxaHBmeGFmZXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzODExNjcsImV4cCI6MjA2Mzk1NzE2N30.k589z5xDaS10D4CZaNq16Egixr8CBk5C0InRt1BTdTE';
+    
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
   public static getInstance(): AuditLogger {

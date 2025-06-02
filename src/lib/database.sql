@@ -1365,4 +1365,529 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_role_changes
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_active_records 
     ON public.audit_logs(created_at DESC) 
-    WHERE archived = FALSE; 
+    WHERE archived = FALSE;
+
+-- ====================================================================================
+-- VULNERABILITY SCANNING SYSTEM SCHEMA
+-- ====================================================================================
+
+-- Vulnerability Scans table - tracks scan executions
+CREATE TABLE IF NOT EXISTS public.vulnerability_scans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scan_id VARCHAR(255) UNIQUE NOT NULL,
+    scan_type VARCHAR(50) NOT NULL CHECK (scan_type IN ('manual', 'scheduled', 'triggered')),
+    
+    -- Configuration
+    configuration JSONB NOT NULL DEFAULT '{}',
+    
+    -- Status and timing
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    scan_duration_ms INTEGER,
+    
+    -- Results summary
+    total_vulnerabilities INTEGER DEFAULT 0,
+    critical_count INTEGER DEFAULT 0,
+    high_count INTEGER DEFAULT 0,
+    medium_count INTEGER DEFAULT 0,
+    low_count INTEGER DEFAULT 0,
+    scan_coverage DECIMAL(5,2) DEFAULT 0.0,
+    
+    -- Metadata
+    scanner_version VARCHAR(50),
+    target_environment VARCHAR(50) CHECK (target_environment IN ('development', 'staging', 'production')),
+    scanned_components JSONB DEFAULT '[]',
+    
+    -- User tracking
+    triggered_by UUID REFERENCES auth.users(id),
+    organization_id UUID REFERENCES public.organizations(id),
+    project_id UUID REFERENCES public.projects(id),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Vulnerability Results table - individual vulnerabilities found
+CREATE TABLE IF NOT EXISTS public.vulnerability_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scan_id UUID NOT NULL REFERENCES public.vulnerability_scans(id) ON DELETE CASCADE,
+    
+    -- Vulnerability identification
+    vulnerability_id VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('dependency', 'security_header', 'api_endpoint', 'configuration', 'code_pattern')),
+    
+    -- Severity and impact
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'low')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    
+    -- Location and context
+    location TEXT,
+    file_path TEXT,
+    line_number INTEGER,
+    
+    -- Security details
+    cve VARCHAR(50),
+    cvss_score DECIMAL(3,1),
+    cwe VARCHAR(50),
+    
+    -- Remediation
+    recommendations JSONB DEFAULT '[]',
+    remediation_effort VARCHAR(20) CHECK (remediation_effort IN ('low', 'medium', 'high')),
+    
+    -- Status tracking
+    status VARCHAR(50) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'in_progress', 'fixed', 'false_positive', 'risk_accepted')),
+    
+    -- Assignment and tracking
+    assigned_to UUID REFERENCES auth.users(id),
+    priority VARCHAR(20) CHECK (priority IN ('critical', 'high', 'medium', 'low')),
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    
+    -- Timestamps
+    detected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Vulnerability Definitions table - known vulnerability patterns and rules
+CREATE TABLE IF NOT EXISTS public.vulnerability_definitions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Identification
+    vulnerability_type VARCHAR(50) NOT NULL,
+    rule_name VARCHAR(255) NOT NULL,
+    rule_id VARCHAR(255) UNIQUE NOT NULL,
+    
+    -- Detection pattern
+    pattern TEXT,
+    pattern_type VARCHAR(50) CHECK (pattern_type IN ('regex', 'semantic', 'static_analysis', 'dependency_check')),
+    
+    -- Classification
+    default_severity VARCHAR(20) NOT NULL CHECK (default_severity IN ('critical', 'high', 'medium', 'low')),
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    
+    -- Security framework mappings
+    owasp_category VARCHAR(100),
+    cwe_id VARCHAR(50),
+    
+    -- Description and guidance
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    impact_description TEXT,
+    remediation_guidance TEXT,
+    
+    -- References
+    references JSONB DEFAULT '[]',
+    
+    -- Rule configuration
+    is_active BOOLEAN DEFAULT true,
+    confidence_level VARCHAR(20) CHECK (confidence_level IN ('high', 'medium', 'low')),
+    false_positive_rate DECIMAL(3,2),
+    
+    -- Metadata
+    created_by UUID REFERENCES auth.users(id),
+    organization_id UUID REFERENCES public.organizations(id),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Scan Schedules table - automated scanning configuration
+CREATE TABLE IF NOT EXISTS public.scan_schedules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Schedule identification
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    -- Schedule configuration
+    cron_expression VARCHAR(100) NOT NULL,
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    
+    -- Scan configuration
+    scan_configuration JSONB NOT NULL DEFAULT '{}',
+    
+    -- Targeting
+    organization_id UUID REFERENCES public.organizations(id),
+    project_id UUID REFERENCES public.projects(id),
+    
+    -- Status
+    is_active BOOLEAN DEFAULT true,
+    last_run_at TIMESTAMP WITH TIME ZONE,
+    next_run_at TIMESTAMP WITH TIME ZONE,
+    last_scan_id UUID REFERENCES public.vulnerability_scans(id),
+    
+    -- Error tracking
+    consecutive_failures INTEGER DEFAULT 0,
+    last_error TEXT,
+    
+    -- Notification settings
+    notification_config JSONB DEFAULT '{}',
+    notify_on_critical BOOLEAN DEFAULT true,
+    notify_on_new_vulnerabilities BOOLEAN DEFAULT true,
+    
+    -- User tracking
+    created_by UUID REFERENCES auth.users(id),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Vulnerability Remediation Tracking
+CREATE TABLE IF NOT EXISTS public.vulnerability_remediations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vulnerability_id UUID NOT NULL REFERENCES public.vulnerability_results(id) ON DELETE CASCADE,
+    
+    -- Remediation details
+    remediation_type VARCHAR(50) CHECK (remediation_type IN ('patch', 'configuration_change', 'code_fix', 'dependency_update', 'mitigation')),
+    description TEXT NOT NULL,
+    
+    -- Implementation tracking
+    status VARCHAR(50) NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'testing', 'deployed', 'verified', 'failed')),
+    
+    -- Assignment
+    assigned_to UUID REFERENCES auth.users(id),
+    approved_by UUID REFERENCES auth.users(id),
+    
+    -- Timeline
+    planned_date DATE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    verified_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Impact and effort
+    estimated_effort_hours DECIMAL(5,1),
+    actual_effort_hours DECIMAL(5,1),
+    business_impact VARCHAR(20) CHECK (business_impact IN ('high', 'medium', 'low', 'none')),
+    
+    -- Change tracking
+    change_request_id VARCHAR(255),
+    deployment_id VARCHAR(255),
+    rollback_plan TEXT,
+    
+    -- Notes and documentation
+    implementation_notes TEXT,
+    testing_notes TEXT,
+    verification_notes TEXT,
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Vulnerability Reports table - formatted reports and summaries
+CREATE TABLE IF NOT EXISTS public.vulnerability_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Report identification
+    report_name VARCHAR(255) NOT NULL,
+    report_type VARCHAR(50) CHECK (report_type IN ('scan_summary', 'trending_analysis', 'compliance_report', 'executive_summary')),
+    
+    -- Report scope
+    scan_ids JSONB DEFAULT '[]',
+    organization_id UUID REFERENCES public.organizations(id),
+    project_id UUID REFERENCES public.projects(id),
+    
+    -- Time period
+    period_start TIMESTAMP WITH TIME ZONE,
+    period_end TIMESTAMP WITH TIME ZONE,
+    
+    -- Report content
+    summary JSONB NOT NULL DEFAULT '{}',
+    detailed_findings JSONB DEFAULT '{}',
+    recommendations JSONB DEFAULT '[]',
+    
+    -- Report metadata
+    report_format VARCHAR(50) CHECK (report_format IN ('json', 'pdf', 'html', 'csv')),
+    report_data JSONB,
+    file_path TEXT,
+    
+    -- Access control
+    visibility VARCHAR(20) DEFAULT 'organization' CHECK (visibility IN ('private', 'organization', 'project', 'public')),
+    
+    -- User tracking
+    generated_by UUID REFERENCES auth.users(id),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ====================================================================================
+-- VULNERABILITY SCANNING INDEXES
+-- ====================================================================================
+
+-- Vulnerability Scans indexes
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_scan_id ON public.vulnerability_scans(scan_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_status ON public.vulnerability_scans(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_scan_type ON public.vulnerability_scans(scan_type);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_triggered_by ON public.vulnerability_scans(triggered_by);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_organization_id ON public.vulnerability_scans(organization_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_project_id ON public.vulnerability_scans(project_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_started_at ON public.vulnerability_scans(started_at);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_completed_at ON public.vulnerability_scans(completed_at);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_target_environment ON public.vulnerability_scans(target_environment);
+
+-- Vulnerability Results indexes
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_scan_id ON public.vulnerability_results(scan_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_vulnerability_id ON public.vulnerability_results(vulnerability_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_type ON public.vulnerability_results(type);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_severity ON public.vulnerability_results(severity);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_status ON public.vulnerability_results(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_assigned_to ON public.vulnerability_results(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_priority ON public.vulnerability_results(priority);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_cve ON public.vulnerability_results(cve);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_detected_at ON public.vulnerability_results(detected_at);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_resolved_at ON public.vulnerability_results(resolved_at);
+
+-- Vulnerability Definitions indexes
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_rule_id ON public.vulnerability_definitions(rule_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_vulnerability_type ON public.vulnerability_definitions(vulnerability_type);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_default_severity ON public.vulnerability_definitions(default_severity);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_category ON public.vulnerability_definitions(category);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_is_active ON public.vulnerability_definitions(is_active);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_organization_id ON public.vulnerability_definitions(organization_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_cwe_id ON public.vulnerability_definitions(cwe_id);
+
+-- Scan Schedules indexes
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_organization_id ON public.scan_schedules(organization_id);
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_project_id ON public.scan_schedules(project_id);
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_is_active ON public.scan_schedules(is_active);
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_next_run_at ON public.scan_schedules(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_last_run_at ON public.scan_schedules(last_run_at);
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_created_by ON public.scan_schedules(created_by);
+
+-- Vulnerability Remediations indexes
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_vulnerability_id ON public.vulnerability_remediations(vulnerability_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_status ON public.vulnerability_remediations(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_remediation_type ON public.vulnerability_remediations(remediation_type);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_assigned_to ON public.vulnerability_remediations(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_planned_date ON public.vulnerability_remediations(planned_date);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_completed_at ON public.vulnerability_remediations(completed_at);
+
+-- Vulnerability Reports indexes
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_report_type ON public.vulnerability_reports(report_type);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_organization_id ON public.vulnerability_reports(organization_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_project_id ON public.vulnerability_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_generated_by ON public.vulnerability_reports(generated_by);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_period_start ON public.vulnerability_reports(period_start);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_period_end ON public.vulnerability_reports(period_end);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_reports_visibility ON public.vulnerability_reports(visibility);
+
+-- Composite indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_org_status_date 
+    ON public.vulnerability_scans(organization_id, status, started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_scan_severity_status 
+    ON public.vulnerability_results(scan_id, severity, status);
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_type_severity_detected 
+    ON public.vulnerability_results(type, severity, detected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_vuln_status_assigned 
+    ON public.vulnerability_remediations(vulnerability_id, status, assigned_to);
+
+-- GIN indexes for JSON data
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_configuration_gin 
+    ON public.vulnerability_scans USING gin (configuration);
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_metadata_gin 
+    ON public.vulnerability_results USING gin (metadata);
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_definitions_references_gin 
+    ON public.vulnerability_definitions USING gin (references);
+
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_notification_config_gin 
+    ON public.scan_schedules USING gin (notification_config);
+
+-- Partial indexes for performance
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_open_critical 
+    ON public.vulnerability_results(detected_at DESC) 
+    WHERE status = 'open' AND severity = 'critical';
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_results_open_high 
+    ON public.vulnerability_results(detected_at DESC) 
+    WHERE status = 'open' AND severity = 'high';
+
+CREATE INDEX IF NOT EXISTS idx_scan_schedules_active_next_run 
+    ON public.scan_schedules(next_run_at ASC) 
+    WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_vulnerability_remediations_pending 
+    ON public.vulnerability_remediations(planned_date ASC) 
+    WHERE status IN ('planned', 'in_progress');
+
+-- ====================================================================================
+-- VULNERABILITY SCANNING RLS POLICIES
+-- ====================================================================================
+
+-- Enable RLS
+ALTER TABLE public.vulnerability_scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vulnerability_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vulnerability_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scan_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vulnerability_remediations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vulnerability_reports ENABLE ROW LEVEL SECURITY;
+
+-- Vulnerability Scans policies
+CREATE POLICY "Users can view their organization's vulnerability scans" ON public.vulnerability_scans
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Admins can manage vulnerability scans" ON public.vulnerability_scans
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+            AND organization_id = vulnerability_scans.organization_id
+        )
+    );
+
+-- Vulnerability Results policies
+CREATE POLICY "Users can view their organization's vulnerability results" ON public.vulnerability_results
+    FOR SELECT USING (
+        scan_id IN (
+            SELECT id FROM public.vulnerability_scans
+            WHERE organization_id IN (
+                SELECT organization_id FROM public.profiles 
+                WHERE id = auth.uid()
+            )
+        )
+    );
+
+CREATE POLICY "Assigned users can update vulnerability results" ON public.vulnerability_results
+    FOR UPDATE USING (
+        assigned_to = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+        )
+    );
+
+-- Vulnerability Definitions policies
+CREATE POLICY "Users can view vulnerability definitions" ON public.vulnerability_definitions
+    FOR SELECT USING (
+        organization_id IS NULL
+        OR organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Admins can manage vulnerability definitions" ON public.vulnerability_definitions
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+        )
+    );
+
+-- Scan Schedules policies
+CREATE POLICY "Users can view their organization's scan schedules" ON public.scan_schedules
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Admins can manage scan schedules" ON public.scan_schedules
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+            AND organization_id = scan_schedules.organization_id
+        )
+    );
+
+-- Vulnerability Remediations policies
+CREATE POLICY "Users can view vulnerability remediations" ON public.vulnerability_remediations
+    FOR SELECT USING (
+        vulnerability_id IN (
+            SELECT vr.id FROM public.vulnerability_results vr
+            JOIN public.vulnerability_scans vs ON vr.scan_id = vs.id
+            WHERE vs.organization_id IN (
+                SELECT organization_id FROM public.profiles 
+                WHERE id = auth.uid()
+            )
+        )
+    );
+
+CREATE POLICY "Assigned users can update vulnerability remediations" ON public.vulnerability_remediations
+    FOR UPDATE USING (
+        assigned_to = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+        )
+    );
+
+-- Vulnerability Reports policies
+CREATE POLICY "Users can view their organization's vulnerability reports" ON public.vulnerability_reports
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id FROM public.profiles 
+            WHERE id = auth.uid()
+        )
+        OR visibility = 'public'
+    );
+
+CREATE POLICY "Admins can manage vulnerability reports" ON public.vulnerability_reports
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role IN ('admin', 'manager')
+            AND organization_id = vulnerability_reports.organization_id
+        )
+    );
+
+-- ====================================================================================
+-- VULNERABILITY SCANNING TRIGGERS
+-- ====================================================================================
+
+-- Add triggers for automatic timestamp updates
+CREATE TRIGGER vulnerability_scans_updated_at 
+    BEFORE UPDATE ON public.vulnerability_scans
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER vulnerability_results_updated_at 
+    BEFORE UPDATE ON public.vulnerability_results
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER vulnerability_definitions_updated_at 
+    BEFORE UPDATE ON public.vulnerability_definitions
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER scan_schedules_updated_at 
+    BEFORE UPDATE ON public.scan_schedules
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER vulnerability_remediations_updated_at 
+    BEFORE UPDATE ON public.vulnerability_remediations
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER vulnerability_reports_updated_at 
+    BEFORE UPDATE ON public.vulnerability_reports
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at(); 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { authService, LoginAttemptResult, LoginSecurityInfo } from '../lib/authService'
+import { authService, LoginAttemptResult, LoginSecurityInfo, securePasswordReset, PasswordResetResult } from '../lib/authService'
 import { sessionManager } from '@/lib/sessionManager'
 
 interface AuthState {
@@ -233,16 +233,9 @@ export const useAuth = () => {
     return {}
   }
 
-  const resetPassword = async (email: string) => {
-    // Use a more robust redirect URL construction
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const redirectUrl = `${baseUrl}/reset-password`;
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl
-    })
-
-    return { error }
+  const resetPassword = async (email: string): Promise<PasswordResetResult> => {
+    // Use the secure password reset with rate limiting
+    return await securePasswordReset(email)
   }
 
   const updatePassword = async (newPassword: string) => {

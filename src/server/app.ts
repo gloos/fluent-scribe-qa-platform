@@ -12,6 +12,7 @@ import { RateLimitMiddleware } from '../lib/middleware/rateLimitMiddleware';
 import { ApiKeyService } from '../lib/services/apiKeyService';
 import { ApiVersionMiddleware, VersionedRequest } from '../lib/middleware/apiVersionMiddleware';
 import { ApiVersionConfiguration } from '../lib/config/apiVersionConfig';
+import { securityRouter } from './routes/security';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -241,10 +242,129 @@ const swaggerOptions = {
 const specs = swaggerJsdoc(swaggerOptions);
 
 // Security middleware
-app.use(helmet());
+// Enhanced security headers configuration with comprehensive CSP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Required for Vite in development and some React functionality
+        "'unsafe-eval'", // Required for development builds and some libraries
+        "https://cdn.gpteng.co", // Required for Lovable platform integration
+        "https://cdn.jsdelivr.net", // CDN for libraries
+        "https://unpkg.com" // CDN for libraries
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Required for styled-components and dynamic styles
+        "https://fonts.googleapis.com" // Google Fonts
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com" // Google Fonts
+      ],
+      imgSrc: [
+        "'self'",
+        "data:", // Data URLs for images
+        "https:", // Allow HTTPS images
+        "blob:", // Blob URLs for generated images/documents
+        "https://lovable.dev" // OpenGraph images
+      ],
+      connectSrc: [
+        "'self'",
+        "https://*.supabase.co", // Supabase backend
+        "wss://*.supabase.co", // Supabase WebSocket connections
+        "https://api.openai.com", // OpenAI API
+        "https://api.anthropic.com", // Anthropic API
+        "https://generativelanguage.googleapis.com", // Google Gemini API
+        "https://api.pwnedpasswords.com", // Password breach checking
+        "https://api.ipify.org", // IP address detection
+        "https://invoice.stripe.com", // Stripe invoice URLs
+        "https://pay.stripe.com", // Stripe payment URLs
+        process.env.NODE_ENV === 'development' ? 'ws://localhost:*' : '' // Vite HMR in development
+      ].filter(Boolean),
+      mediaSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      basUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"], // Prevent embedding in frames
+      ...(process.env.NODE_ENV === 'production' && { upgradeInsecureRequests: [] })
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Disabled to allow external resources
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  dnsPrefetchControl: { allow: false },
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  ieNoOpen: true,
+  noSniff: true,
+  originAgentCluster: true,
+  permittedCrossDomainPolicies: false,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  xssFilter: true
+}));
+
+// Additional modern security headers
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Permissions Policy (formerly Feature Policy)
+  res.setHeader('Permissions-Policy', [
+    'camera=()',
+    'microphone=()',
+    'geolocation=()',
+    'payment=()',
+    'usb=()',
+    'magnetometer=()',
+    'gyroscope=()',
+    'accelerometer=()',
+    'ambient-light-sensor=()',
+    'autoplay=()',
+    'encrypted-media=()',
+    'fullscreen=(self)',
+    'picture-in-picture=()'
+  ].join(', '));
+
+  // Cross-Origin-Embedder-Policy for enhanced security (disabled above in helmet for compatibility)
+  // res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  
+  // Security-focused headers
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('X-Download-Options', 'noopen');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  
+  // Clear potentially sensitive headers
+  res.removeHeader('X-Powered-By');
+  res.removeHeader('Server');
+  
+  next();
+});
+
+// CORS configuration with enhanced security
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-API-Key',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'User-Agent'
+  ],
+  exposedHeaders: [
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset',
+    'X-Response-Time'
+  ],
+  maxAge: 86400 // 24 hours for preflight cache
 }));
 
 // Basic middleware
@@ -278,6 +398,12 @@ app.use(ApiAuthMiddleware.recordResponse());
 
 // API Versioning middleware - applies to all /api/* routes
 app.use('/api', ApiVersionMiddleware.extractVersion);
+
+// API routes
+// app.use('/api/v1/qa', qaSessionRouter);
+// app.use('/api/v1/files', fileUploadRouter);
+// app.use('/api/v1/transcription', transcriptionRouter);
+app.use('/api/v1/security', securityRouter);
 
 /**
  * @swagger
