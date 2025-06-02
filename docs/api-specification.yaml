@@ -1,0 +1,1362 @@
+openapi: 3.0.3
+info:
+  title: AI-Powered Linguistic QA Platform API
+  description: |
+    RESTful API for the AI-Powered Linguistic QA Platform, enabling external integrations for XLIFF file processing, 
+    quality assessment workflows, and MQM (Multidimensional Quality Metrics) scoring.
+    
+    This platform processes translation files using advanced LLMs to provide detailed quality assessment reports.
+  version: 1.0.0
+  contact:
+    name: QA Platform Support
+    email: support@qa-platform.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.qa-platform.com/v1
+    description: Production server
+  - url: https://staging-api.qa-platform.com/v1
+    description: Staging server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  # Health and Status Endpoints
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the current health status of the API
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /version:
+    get:
+      summary: API version information
+      description: |
+        Returns comprehensive information about API versions, including:
+        - Current version details and status
+        - Supported versions and their lifecycle
+        - Deprecation policies and sunset dates
+        - Migration paths between versions
+        - Version-specific endpoint availability
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: API version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfoResponse'
+
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      summary: User authentication
+      description: Authenticate user with email and password
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/logout:
+    post:
+      summary: User logout
+      description: Invalidate current user session
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # File Upload and Processing Endpoints
+  /files:
+    get:
+      summary: List uploaded files
+      description: Retrieve a list of uploaded files with their processing status
+      tags:
+        - Files
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [uploaded, processing, completed, failed]
+          description: Filter files by processing status
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of files to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of files to skip
+        - in: query
+          name: file_type
+          schema:
+            type: string
+            enum: [xliff_1_2, xliff_2_0, mxliff]
+          description: Filter by file format
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Upload XLIFF file for processing
+      description: Upload an XLIFF file for quality assessment analysis
+      tags:
+        - Files
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: XLIFF file to process (supports 1.2, 2.0, MXLIFF)
+                source_language:
+                  type: string
+                  example: "en"
+                  description: Source language code (ISO 639-1)
+                target_language:
+                  type: string
+                  example: "fr"
+                  description: Target language code (ISO 639-1)
+                assessment_model:
+                  type: string
+                  enum: [gpt-4, gpt-3.5-turbo, claude-3, gemini-pro]
+                  default: gpt-4
+                  description: LLM model to use for assessment
+                priority:
+                  type: string
+                  enum: [low, normal, high]
+                  default: normal
+                  description: Processing priority
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /files/{fileId}:
+    get:
+      summary: Get file details
+      description: Retrieve detailed information about a specific file
+      tags:
+        - Files
+      parameters:
+        - in: path
+          name: fileId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique file identifier
+      responses:
+        '200':
+          description: File details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    delete:
+      summary: Delete file
+      description: Delete an uploaded file and its associated data
+      tags:
+        - Files
+      parameters:
+        - in: path
+          name: fileId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique file identifier
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Quality Assessment Endpoints
+  /assessments:
+    get:
+      summary: List quality assessments
+      description: Retrieve a list of quality assessments with filtering options
+      tags:
+        - Assessments
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed]
+          description: Filter assessments by status
+        - in: query
+          name: file_id
+          schema:
+            type: string
+            format: uuid
+          description: Filter by specific file ID
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of assessments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Create new assessment
+      description: Initiate a new quality assessment for an uploaded file
+      tags:
+        - Assessments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssessmentRequest'
+      responses:
+        '201':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /assessments/{assessmentId}:
+    get:
+      summary: Get assessment details
+      description: Retrieve detailed results of a quality assessment
+      tags:
+        - Assessments
+      parameters:
+        - in: path
+          name: assessmentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique assessment identifier
+      responses:
+        '200':
+          description: Assessment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /assessments/{assessmentId}/report:
+    get:
+      summary: Download assessment report
+      description: Download the complete assessment report in various formats
+      tags:
+        - Assessments
+      parameters:
+        - in: path
+          name: assessmentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique assessment identifier
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [pdf, excel, csv, json]
+            default: pdf
+          description: Report format
+      responses:
+        '200':
+          description: Assessment report file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Batch Processing Endpoints
+  /batches:
+    get:
+      summary: List batch processes
+      description: Retrieve a list of batch processing jobs
+      tags:
+        - Batches
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [created, processing, completed, failed, cancelled]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of batch processes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Create batch processing job
+      description: Create a new batch processing job for multiple files
+      tags:
+        - Batches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBatchRequest'
+      responses:
+        '201':
+          description: Batch job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /batches/{batchId}:
+    get:
+      summary: Get batch details
+      description: Retrieve detailed information about a batch processing job
+      tags:
+        - Batches
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Batch details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    patch:
+      summary: Update batch status
+      description: Update the status of a batch processing job
+      tags:
+        - Batches
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBatchRequest'
+      responses:
+        '200':
+          description: Batch updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Webhook Endpoints
+  /webhooks:
+    get:
+      summary: List webhooks
+      description: Retrieve a list of configured webhooks
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Create webhook
+      description: Create a new webhook endpoint for receiving notifications
+      tags:
+        - Webhooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /webhooks/{webhookId}:
+    get:
+      summary: Get webhook details
+      description: Retrieve detailed information about a specific webhook
+      tags:
+        - Webhooks
+      parameters:
+        - in: path
+          name: webhookId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    patch:
+      summary: Update webhook
+      description: Update webhook configuration
+      tags:
+        - Webhooks
+      parameters:
+        - in: path
+          name: webhookId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWebhookRequest'
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    delete:
+      summary: Delete webhook
+      description: Delete a webhook endpoint
+      tags:
+        - Webhooks
+      parameters:
+        - in: path
+          name: webhookId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    # Common schemas
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [healthy, degraded, down]
+            llm_provider:
+              type: string
+              enum: [healthy, degraded, down]
+            file_storage:
+              type: string
+              enum: [healthy, degraded, down]
+
+    VersionInfoResponse:
+      type: object
+      properties:
+        current:
+          type: object
+          properties:
+            version:
+              type: string
+              example: "1.0.0"
+              description: Current API version being used
+            isLatest:
+              type: boolean
+              example: true
+              description: Whether this is the latest available version
+            isDeprecated:
+              type: boolean
+              example: false
+              description: Whether this version is deprecated
+            deprecationDate:
+              type: string
+              format: date-time
+              description: Date when this version was deprecated (if applicable)
+            sunsetDate:
+              type: string
+              format: date-time
+              description: Date when this version will be sunset (if applicable)
+        configuration:
+          type: object
+          properties:
+            strategy:
+              type: object
+              properties:
+                format:
+                  type: string
+                  example: "semantic"
+                  description: Version numbering format
+                urlFormat:
+                  type: string
+                  example: "/api/v{major}"
+                  description: URL versioning format
+                defaultVersion:
+                  type: string
+                  example: "1.0.0"
+                  description: Default version when none specified
+                latestVersion:
+                  type: string
+                  example: "1.0.0"
+                  description: Latest available version
+            supported:
+              type: array
+              items:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  status:
+                    type: string
+                    enum: [supported, deprecated, sunset]
+                  deprecationDate:
+                    type: string
+                    format: date-time
+                  sunsetDate:
+                    type: string
+                    format: date-time
+            planned:
+              type: array
+              items:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "2.0.0"
+                  plannedReleaseDate:
+                    type: string
+                    format: date-time
+                  majorChanges:
+                    type: array
+                    items:
+                      type: string
+            migrations:
+              type: array
+              items:
+                type: object
+                properties:
+                  fromVersion:
+                    type: string
+                    example: "1.0.0"
+                  toVersion:
+                    type: string
+                    example: "2.0.0"
+                  migrationGuideUrl:
+                    type: string
+                    format: uri
+                  breakingChanges:
+                    type: array
+                    items:
+                      type: string
+                  automationAvailable:
+                    type: boolean
+            endpoints:
+              type: object
+              description: Version-specific endpoint availability
+        timestamp:
+          type: string
+          format: date-time
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Operation completed successfully"
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "validation_error"
+            message:
+              type: string
+              example: "Invalid input data"
+            details:
+              type: array
+              items:
+                type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # Authentication schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: "securepassword123"
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          example: 3600
+          description: Token expiration time in seconds
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        created_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+
+    # File schemas
+    FileListResponse:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileInfo'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    FileInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+          example: "translation_project.xliff"
+        file_type:
+          type: string
+          enum: [xliff_1_2, xliff_2_0, mxliff]
+        file_size:
+          type: integer
+          description: File size in bytes
+        status:
+          type: string
+          enum: [uploaded, processing, completed, failed]
+        source_language:
+          type: string
+          example: "en"
+        target_language:
+          type: string
+          example: "fr"
+        uploaded_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+        segment_count:
+          type: integer
+          description: Number of translation segments
+
+    FileUploadResponse:
+      type: object
+      properties:
+        file:
+          $ref: '#/components/schemas/FileInfo'
+        upload_url:
+          type: string
+          description: Presigned URL for file upload (if using cloud storage)
+
+    FileDetails:
+      allOf:
+        - $ref: '#/components/schemas/FileInfo'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              properties:
+                xliff_version:
+                  type: string
+                tool_id:
+                  type: string
+                project_id:
+                  type: string
+                client_info:
+                  type: object
+            error_details:
+              type: string
+              description: Error message if processing failed
+
+    # Assessment schemas
+    AssessmentListResponse:
+      type: object
+      properties:
+        assessments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentInfo'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    AssessmentInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        file_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        model_used:
+          type: string
+          example: "gpt-4"
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        mqm_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Overall MQM quality score
+        error_count:
+          type: integer
+          description: Total number of errors found
+
+    CreateAssessmentRequest:
+      type: object
+      required:
+        - file_id
+      properties:
+        file_id:
+          type: string
+          format: uuid
+        model:
+          type: string
+          enum: [gpt-4, gpt-3.5-turbo, claude-3, gemini-pro]
+          default: gpt-4
+        assessment_criteria:
+          type: array
+          items:
+            type: string
+            enum: [accuracy, fluency, terminology, style, locale_conventions]
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+
+    AssessmentResponse:
+      type: object
+      properties:
+        assessment:
+          $ref: '#/components/schemas/AssessmentInfo'
+        estimated_completion:
+          type: string
+          format: date-time
+
+    AssessmentDetails:
+      allOf:
+        - $ref: '#/components/schemas/AssessmentInfo'
+        - type: object
+          properties:
+            results:
+              type: object
+              properties:
+                overall_score:
+                  type: number
+                  format: float
+                category_scores:
+                  type: object
+                  properties:
+                    accuracy:
+                      type: number
+                      format: float
+                    fluency:
+                      type: number
+                      format: float
+                    terminology:
+                      type: number
+                      format: float
+                    style:
+                      type: number
+                      format: float
+                errors:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/QualityError'
+                recommendations:
+                  type: array
+                  items:
+                    type: string
+
+    QualityError:
+      type: object
+      properties:
+        id:
+          type: string
+        segment_id:
+          type: string
+        category:
+          type: string
+          enum: [accuracy, fluency, terminology, style, locale_conventions]
+        severity:
+          type: string
+          enum: [minor, major, critical]
+        description:
+          type: string
+        source_text:
+          type: string
+        target_text:
+          type: string
+        suggested_fix:
+          type: string
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    # Batch processing schemas
+    BatchListResponse:
+      type: object
+      properties:
+        batches:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchInfo'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    BatchInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [created, processing, completed, failed, cancelled]
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        file_count:
+          type: integer
+        completed_count:
+          type: integer
+        failed_count:
+          type: integer
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+
+    CreateBatchRequest:
+      type: object
+      required:
+        - name
+        - file_ids
+      properties:
+        name:
+          type: string
+          example: "Monthly Translation Review"
+        description:
+          type: string
+        file_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+        assessment_config:
+          type: object
+          properties:
+            model:
+              type: string
+              enum: [gpt-4, gpt-3.5-turbo, claude-3, gemini-pro]
+            criteria:
+              type: array
+              items:
+                type: string
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+        webhook_url:
+          type: string
+          format: uri
+          description: URL to notify when batch completes
+
+    BatchResponse:
+      type: object
+      properties:
+        batch:
+          $ref: '#/components/schemas/BatchInfo'
+        estimated_completion:
+          type: string
+          format: date-time
+
+    BatchDetails:
+      allOf:
+        - $ref: '#/components/schemas/BatchInfo'
+        - type: object
+          properties:
+            files:
+              type: array
+              items:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                  filename:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, processing, completed, failed]
+                  assessment_id:
+                    type: string
+                    format: uuid
+                  error_message:
+                    type: string
+            summary:
+              type: object
+              properties:
+                total_segments:
+                  type: integer
+                average_mqm_score:
+                  type: number
+                  format: float
+                total_errors:
+                  type: integer
+                processing_time:
+                  type: integer
+                  description: Total processing time in seconds
+
+    UpdateBatchRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [cancelled]
+
+    # Webhook schemas
+    WebhookListResponse:
+      type: object
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateWebhookRequest:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+          example: "https://your-app.com/webhook/qa-platform"
+        events:
+          type: array
+          items:
+            type: string
+            enum: [file.uploaded, assessment.completed, batch.completed, assessment.failed]
+          minItems: 1
+        secret:
+          type: string
+          description: Secret for webhook signature verification
+        active:
+          type: boolean
+          default: true
+
+    WebhookResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        last_delivery:
+          type: string
+          format: date-time
+        delivery_count:
+          type: integer
+
+    UpdateWebhookRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+
+    # Common utility schemas
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        has_more:
+          type: boolean
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "unauthorized"
+              message: "Authentication required"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "forbidden"
+              message: "Insufficient permissions"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "not_found"
+              message: "Resource not found"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    BadRequestError:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "bad_request"
+              message: "Invalid request data"
+              details: ["field 'file_id' is required"]
+            timestamp: "2024-01-15T10:30:00Z"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "validation_error"
+              message: "Request validation failed"
+              details: ["email must be a valid email address"]
+            timestamp: "2024-01-15T10:30:00Z"
+
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Files
+    description: File upload and management
+  - name: Assessments
+    description: Quality assessment operations
+  - name: Batches
+    description: Batch processing management
+  - name: Webhooks
+    description: Webhook management for notifications 

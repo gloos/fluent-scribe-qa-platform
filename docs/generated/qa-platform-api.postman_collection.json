@@ -1,0 +1,1041 @@
+{
+  "info": {
+    "name": "AI-Powered Linguistic QA Platform API",
+    "description": "\n        RESTful API for the AI-Powered Linguistic QA Platform, enabling external integrations for XLIFF file processing, \n        quality assessment workflows, and MQM (Multidimensional Quality Metrics) scoring.\n        \n        This platform processes translation files using advanced LLMs to provide detailed quality assessment reports.\n      ",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "your-api-key-here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health check endpoint",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Returns the current health status of the API"
+      }
+    },
+    {
+      "name": "User authentication",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Authenticate user with email and password",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "User logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/logout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        },
+        "description": "Invalidate current user session"
+      }
+    },
+    {
+      "name": "List API keys",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api-keys",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api-keys"
+          ]
+        },
+        "description": "Retrieve all API keys for the authenticated user, including usage statistics and metadata"
+      }
+    },
+    {
+      "name": "Create API key",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api-keys",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api-keys"
+          ]
+        },
+        "description": "Generate a new API key with specified permissions and rate limits. The API key value is only returned once and cannot be retrieved again.",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get API key details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api-keys/{keyId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api-keys",
+            "{keyId}"
+          ]
+        },
+        "description": "Retrieve detailed information about a specific API key including usage statistics"
+      }
+    },
+    {
+      "name": "Update API key",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api-keys/{keyId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api-keys",
+            "{keyId}"
+          ]
+        },
+        "description": "Update API key configuration including name, description, permissions, and rate limits",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete API key",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api-keys/{keyId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api-keys",
+            "{keyId}"
+          ]
+        },
+        "description": "Permanently delete an API key. This action cannot be undone and will immediately invalidate the key."
+      }
+    },
+    {
+      "name": "List uploaded files",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/files",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "files"
+          ]
+        },
+        "description": "Retrieve a list of uploaded files with their processing status"
+      }
+    },
+    {
+      "name": "Upload XLIFF file for processing",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/files",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "files"
+          ]
+        },
+        "description": "Upload an XLIFF file for quality assessment analysis",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "0 openapi",
+      "request": {
+        "method": "0",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}openapi",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi"
+          ]
+        }
+      }
+    },
+    {
+      "name": "1 openapi",
+      "request": {
+        "method": "1",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}openapi",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2 openapi",
+      "request": {
+        "method": "2",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}openapi",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3 openapi",
+      "request": {
+        "method": "3",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}openapi",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4 openapi",
+      "request": {
+        "method": "4",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}openapi",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TITLE info",
+      "request": {
+        "method": "TITLE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}info",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "info"
+          ]
+        }
+      }
+    },
+    {
+      "name": "DESCRIPTION info",
+      "request": {
+        "method": "DESCRIPTION",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}info",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "info"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VERSION info",
+      "request": {
+        "method": "VERSION",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}info",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "info"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CONTACT info",
+      "request": {
+        "method": "CONTACT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}info",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "info"
+          ]
+        }
+      }
+    },
+    {
+      "name": "LICENSE info",
+      "request": {
+        "method": "LICENSE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}info",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "info"
+          ]
+        }
+      }
+    },
+    {
+      "name": "0 servers",
+      "request": {
+        "method": "0",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}servers",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "servers"
+          ]
+        },
+        "description": "Production server"
+      }
+    },
+    {
+      "name": "1 servers",
+      "request": {
+        "method": "1",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}servers",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "servers"
+          ]
+        },
+        "description": "Staging server"
+      }
+    },
+    {
+      "name": "2 servers",
+      "request": {
+        "method": "2",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}servers",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "servers"
+          ]
+        },
+        "description": "Development server"
+      }
+    },
+    {
+      "name": "0 security",
+      "request": {
+        "method": "0",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}security",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "security"
+          ]
+        }
+      }
+    },
+    {
+      "name": "1 security",
+      "request": {
+        "method": "1",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}security",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "security"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get file details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/files/{fileId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "files",
+            "{fileId}"
+          ]
+        },
+        "description": "Retrieve detailed information about a specific file"
+      }
+    },
+    {
+      "name": "Delete file",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/files/{fileId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "files",
+            "{fileId}"
+          ]
+        },
+        "description": "Delete an uploaded file and its associated data"
+      }
+    },
+    {
+      "name": "List quality assessments",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/assessments",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "assessments"
+          ]
+        },
+        "description": "Retrieve a list of quality assessments with filtering options"
+      }
+    },
+    {
+      "name": "Create new assessment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/assessments",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "assessments"
+          ]
+        },
+        "description": "Initiate a new quality assessment for an uploaded file",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get assessment details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/assessments/{assessmentId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "assessments",
+            "{assessmentId}"
+          ]
+        },
+        "description": "Retrieve detailed results of a quality assessment"
+      }
+    },
+    {
+      "name": "Download assessment report",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/assessments/{assessmentId}/report",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "assessments",
+            "{assessmentId}",
+            "report"
+          ]
+        },
+        "description": "Download the complete assessment report in various formats"
+      }
+    },
+    {
+      "name": "List batch processes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/batches",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "batches"
+          ]
+        },
+        "description": "Retrieve a list of batch processing jobs"
+      }
+    },
+    {
+      "name": "Create batch processing job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/batches",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "batches"
+          ]
+        },
+        "description": "Create a new batch processing job for multiple files",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get batch details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/batches/{batchId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "batches",
+            "{batchId}"
+          ]
+        },
+        "description": "Retrieve detailed information about a batch processing job"
+      }
+    },
+    {
+      "name": "Update batch status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/batches/{batchId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "batches",
+            "{batchId}"
+          ]
+        },
+        "description": "Update the status of a batch processing job",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "List webhooks",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/webhooks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhooks"
+          ]
+        },
+        "description": "Retrieve a list of configured webhooks"
+      }
+    },
+    {
+      "name": "Create webhook",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/webhooks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhooks"
+          ]
+        },
+        "description": "Create a new webhook endpoint for receiving notifications",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get webhook details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/webhooks/{webhookId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhooks",
+            "{webhookId}"
+          ]
+        },
+        "description": "Retrieve detailed information about a specific webhook"
+      }
+    },
+    {
+      "name": "Update webhook",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/webhooks/{webhookId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhooks",
+            "{webhookId}"
+          ]
+        },
+        "description": "Update webhook configuration",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete webhook",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/webhooks/{webhookId}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "webhooks",
+            "{webhookId}"
+          ]
+        },
+        "description": "Delete a webhook endpoint"
+      }
+    }
+  ]
+}

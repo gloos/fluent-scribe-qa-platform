@@ -1,7 +1,8 @@
 import { createQASession } from './api'
 import { supabase } from './supabase'
-import { QASession } from './types/qa-session'
+import type { QASession } from './types/qa-session'
 import { processXLIFFFileForSession } from './xliff-processing'
+import { usageTracker, type WordCountResult } from '@/lib/services/usage-tracking-service'
 
 export interface FileProcessingOptions {
   autoStart?: boolean
@@ -167,6 +168,10 @@ const analyzeSessionSegments = async (sessionId: string): Promise<void> => {
     
     console.log(`🔍 Analyzing ${segments.length} segments...`);
     
+    // Count words in segments for usage tracking
+    const wordCount = usageTracker.countWordsFromSegments(segments);
+    console.log(`📊 Word count: ${wordCount.totalWords} total (${wordCount.sourceWords} source + ${wordCount.targetWords} target)`);
+    
     // Analyze each segment
     let totalMqmScore = 0;
     let errorCount = 0;
@@ -236,7 +241,8 @@ const analyzeSessionSegments = async (sessionId: string): Promise<void> => {
           analysisCompleted: new Date().toISOString(),
           analyzedSegments: segments.length,
           llmAnalysisEnabled: true,
-          modelUsed: modelUsed
+          modelUsed: modelUsed,
+          wordCount: wordCount // Include word count in results
         },
         updated_at: new Date().toISOString()
       })
@@ -264,11 +270,74 @@ const analyzeSessionSegments = async (sessionId: string): Promise<void> => {
     } else {
       console.log('✅ Session status updated to completed successfully');
     }
+
+    // Track usage for billing
+    try {
+      await trackQASessionUsage(sessionId, wordCount);
+    } catch (usageError) {
+      console.error('⚠️ Failed to track usage for billing:', usageError);
+      // Don't fail the analysis if usage tracking fails
+    }
     
     console.log(`🎉 LLM analysis completed: ${segments.length} segments, avg score: ${averageMqmScore.toFixed(2)}, errors: ${errorCount}, warnings: ${warningCount}`);
     
   } catch (error) {
     console.error('❌ Error in session segment analysis:', error);
+    throw error;
+  }
+};
+
+/**
+ * Track usage for a QA session
+ */
+const trackQASessionUsage = async (sessionId: string, wordCount: WordCountResult): Promise<void> => {
+  try {
+    // Get session details to find user and potentially subscription
+    const { data: session, error: sessionError } = await supabase
+      .from('qa_sessions')
+      .select('user_id, file_name')
+      .eq('id', sessionId)
+      .single();
+
+    if (sessionError || !session) {
+      console.error('❌ Failed to get session for usage tracking:', sessionError);
+      return;
+    }
+
+    // Get user's subscription (if they have one)
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('billing_subscriptions')
+      .select('id')
+      .eq('billing_customer_id', session.user_id) // Assuming user_id maps to customer_id
+      .eq('status', 'active')
+      .limit(1)
+      .single();
+
+    if (subscriptionError || !subscription) {
+      console.log('📊 No active subscription found for user - tracking usage without billing');
+      
+      // Could still track usage for analytics, but skip billing
+      return;
+    }
+
+    // Record usage for billing
+    console.log(`💰 Recording usage: ${wordCount.totalWords} words for subscription ${subscription.id}`);
+    
+    const usageRecord = await usageTracker.recordQASessionUsage(
+      sessionId,
+      subscription.id,
+      wordCount,
+      {
+        fileName: session.file_name,
+        modelUsed: 'claude-3-5-sonnet-simulated',
+        analysisType: 'qa_analysis'
+      }
+    );
+
+    console.log(`✅ Usage recorded: ${usageRecord.id} (Cost: $${usageRecord.total_cost})`);
+    
+  } catch (error) {
+    console.error('❌ Error tracking QA session usage:', error);
     throw error;
   }
 };
@@ -486,9 +555,10 @@ const simulateAnalysis = async (sessionId: string): Promise<void> => {
       console.log('📄 No segments found, performing basic file analysis...');
       
       // Generate some basic analysis results for non-XLIFF files
+      const estimatedWordCount = Math.floor(Math.random() * 1000) + 100;
       const mockResults = {
         segmentCount: 0,
-        wordCount: Math.floor(Math.random() * 1000) + 100,
+        wordCount: estimatedWordCount,
         translatedSegments: 0,
         processingTime: Math.floor(Math.random() * 5000) + 1000,
         timestamp: new Date().toISOString(),
@@ -517,7 +587,22 @@ const simulateAnalysis = async (sessionId: string): Promise<void> => {
         throw updateError;
       }
 
-      console.log(`🎉 Basic analysis completed for session ${sessionId.slice(0, 8)}... (Score: ${Number(mqmScore.toFixed(2))}, Errors: ${errorCount})`)
+      // Track usage for billing (basic file analysis)
+      try {
+        const basicWordCount: WordCountResult = {
+          totalWords: estimatedWordCount,
+          sourceWords: Math.floor(estimatedWordCount * 0.6), // Estimate 60% source
+          targetWords: Math.floor(estimatedWordCount * 0.4), // Estimate 40% target
+          segmentCount: 0
+        };
+        
+        await trackQASessionUsage(sessionId, basicWordCount);
+      } catch (usageError) {
+        console.error('⚠️ Failed to track usage for basic analysis:', usageError);
+        // Don't fail the analysis if usage tracking fails
+      }
+
+      console.log(`🎉 Basic analysis completed for session ${sessionId.slice(0, 8)}... (Score: ${Number(mqmScore.toFixed(2))}, Errors: ${errorCount}, Words: ${estimatedWordCount})`)
     }
 
   } catch (error) {

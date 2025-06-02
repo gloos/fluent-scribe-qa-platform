@@ -1,19 +1,18 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { CreditCard, Download, TrendingUp, FileText, Calendar } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import Header from "@/components/layout/Header";
+import ReceiptList from "@/components/billing/ReceiptList";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 interface BillingData {
   currentPlan: string;
@@ -23,17 +22,11 @@ interface BillingData {
   nextBilling: string;
 }
 
-interface Invoice {
-  id: string;
-  date: string;
-  amount: number;
-  status: "paid" | "pending" | "failed";
-  wordsProcessed: number;
-  downloadUrl: string;
-}
-
 const Billing = () => {
-  const [billingPeriod, setBillingPeriod] = useState("monthly");
+  const [billingCustomerId, setBillingCustomerId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user, isAuthenticated } = useAuth();
 
   const billingData: BillingData = {
     currentPlan: "Professional",
@@ -43,53 +36,45 @@ const Billing = () => {
     nextBilling: "2024-02-15",
   };
 
-  const invoices: Invoice[] = [
-    {
-      id: "INV-2024-001",
-      date: "2024-01-15",
-      amount: 89.50,
-      status: "paid",
-      wordsProcessed: 125430,
-      downloadUrl: "#",
-    },
-    {
-      id: "INV-2023-012",
-      date: "2023-12-15",
-      amount: 76.20,
-      status: "paid",
-      wordsProcessed: 106800,
-      downloadUrl: "#",
-    },
-    {
-      id: "INV-2023-011",
-      date: "2023-11-15",
-      amount: 92.30,
-      status: "paid",
-      wordsProcessed: 129400,
-      downloadUrl: "#",
-    },
-    {
-      id: "INV-2023-010",
-      date: "2023-10-15",
-      amount: 83.70,
-      status: "paid",
-      wordsProcessed: 117200,
-      downloadUrl: "#",
-    },
-  ];
+  // Fetch billing customer ID for the current user
+  useEffect(() => {
+    const fetchBillingCustomer = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setError(null);
+        const { data, error } = await supabase
+          .from('billing_customers')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No billing customer found - this is okay for new users
+            setError('No billing account found. Please contact support to set up billing.');
+          } else {
+            throw error;
+          }
+        } else {
+          setBillingCustomerId(data.id);
+        }
+      } catch (err) {
+        console.error('Error fetching billing customer:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load billing information');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBillingCustomer();
+  }, [user?.id]);
 
   const usagePercentage = (billingData.wordsProcessed / billingData.wordsLimit) * 100;
-
-  const getStatusBadge = (status: Invoice["status"]) => {
-    switch (status) {
-      case "paid":
-        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -105,6 +90,19 @@ const Billing = () => {
       currency: "USD",
     }).format(amount);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Please sign in to view billing information</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -123,6 +121,18 @@ const Billing = () => {
             Update Payment Method
           </Button>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <Card className="mb-8 border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2">
+                <div className="text-red-600">⚠️</div>
+                <p className="text-red-700">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Current Plan & Usage */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -233,52 +243,39 @@ const Billing = () => {
           </CardContent>
         </Card>
 
-        {/* Invoice History */}
+        {/* Receipt History - Real Implementation */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Invoice History</CardTitle>
+                <CardTitle>Payment Receipts</CardTitle>
                 <CardDescription>
-                  Download and view your past invoices
+                  View and download your payment receipts
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Download All
-              </Button>
+              {/* Remove the Download All button as it's not needed with the ReceiptList component */}
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Words Processed</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{formatDate(invoice.date)}</TableCell>
-                    <TableCell>{invoice.wordsProcessed.toLocaleString()}</TableCell>
-                    <TableCell>{formatCurrency(invoice.amount)}</TableCell>
-                    <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline">
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-gray-600">Loading billing information...</span>
+              </div>
+            ) : billingCustomerId ? (
+              <ReceiptList 
+                customerId={billingCustomerId}
+                className="mt-0"
+              />
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-lg mb-2">📧</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No billing account found</h3>
+                <p className="text-gray-500">
+                  Please contact support to set up your billing account.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

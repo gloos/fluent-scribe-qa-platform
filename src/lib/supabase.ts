@@ -4,9 +4,22 @@ import { createClient } from '@supabase/supabase-js'
 export * from './types/user'
 import type { Database } from './types/user'
 
+// Environment variable detection - works in both client and server environments
+const getEnvVar = (name: string) => {
+  // In Node.js/server environment
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[name];
+  }
+  // In browser/Vite environment
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[name];
+  }
+  return undefined;
+};
+
 // Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://uqprvrrncpqhpfxafeuc.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your_anon_key_here'
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || 'https://uqprvrrncpqhpfxafeuc.supabase.co'
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY') || 'your_anon_key_here'
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')

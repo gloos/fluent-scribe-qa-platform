@@ -9,6 +9,7 @@ import Upload from "./pages/Upload";
 import Reports from "./pages/Reports";
 import DetailedReport from "./pages/DetailedReport";
 import Billing from "./pages/Billing";
+import FinancialReports from "./pages/FinancialReports";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -62,6 +63,11 @@ const App = () => (
               <Billing />
             </RoleProtectedRoute>
           } />
+          <Route path="/financial-reports" element={
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_ALL_BILLING}>
+              <FinancialReports />
+            </RoleProtectedRoute>
+          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
@@ -86,33 +92,31 @@ const App = () => (
             </RoleProtectedRoute>
           } />
           
-          {/* Demo and Development Routes */}
-          <Route path="/demo/permissions" element={
-            <ProtectedRoute>
-              <PermissionDemo />
-            </ProtectedRoute>
-          } />
-          
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<EmailVerification />} />
-          
-          {/* Feedback and QA Routes */}
-          <Route path="/feedback-demo" element={
+          {/* Demo Routes - Development */}
+          <Route path="/demo/feedback" element={
             <ProtectedRoute>
               <FeedbackDemo />
             </ProtectedRoute>
           } />
-          <Route path="/qa-errors" element={
-            <RoleProtectedRoute requiredPermission={Permission.VIEW_QA_SESSION}>
+          <Route path="/demo/qa-errors" element={
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_REPORTS}>
               <QAErrors />
             </RoleProtectedRoute>
           } />
+          <Route path="/demo/permissions" element={
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_USERS}>
+              <PermissionDemo />
+            </RoleProtectedRoute>
+          } />
           
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* Authentication Routes */}
+          <Route path="/auth/login" element={<Login />} />
+          <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/verify-email" element={<EmailVerification />} />
+          
+          {/* 404 Not Found */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
