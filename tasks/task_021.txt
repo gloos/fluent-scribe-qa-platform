@@ -1,6 +1,6 @@
 # Task ID: 21
 # Title: Optimize Performance for Large Files
-# Status: in-progress
+# Status: done
 # Dependencies: None
 # Priority: medium
 # Description: Ensure efficient processing of large XLIFF files with real-time progress tracking.
