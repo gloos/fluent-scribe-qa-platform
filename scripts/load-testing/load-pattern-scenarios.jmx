@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Load Pattern Scenarios Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments">Peak/off-peak usage patterns and incremental stress testing scenarios</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="DB_URL" elementType="Argument">
+            <stringProp name="Argument.name">DB_URL</stringProp>
+            <stringProp name="Argument.value">jdbc:postgresql://aws-0-us-west-1.pooler.supabase.com:6543/postgres</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="DB_USERNAME" elementType="Argument">
+            <stringProp name="Argument.name">DB_USERNAME</stringProp>
+            <stringProp name="Argument.value">postgres.uqprvrrncpqhpfxafeuc</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="DB_PASSWORD" elementType="Argument">
+            <stringProp name="Argument.name">DB_PASSWORD</stringProp>
+            <stringProp name="Argument.value">${__P(db.password,YOUR_SERVICE_ROLE_KEY_HERE)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="PEAK_USERS" elementType="Argument">
+            <stringProp name="Argument.name">PEAK_USERS</stringProp>
+            <stringProp name="Argument.value">${__P(peak.users,50)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="STRESS_MAX_USERS" elementType="Argument">
+            <stringProp name="Argument.name">STRESS_MAX_USERS</stringProp>
+            <stringProp name="Argument.value">${__P(stress.max.users,200)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="TEST_DURATION" elementType="Argument">
+            <stringProp name="Argument.name">TEST_DURATION</stringProp>
+            <stringProp name="Argument.value">${__P(test.duration,900)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="PostgreSQL Connection" enabled="true">
+        <boolProp name="autocommit">true</boolProp>
+        <stringProp name="checkQuery">SELECT 1</stringProp>
+        <stringProp name="connectionAge">5000</stringProp>
+        <stringProp name="dataSource">postgresql</stringProp>
+        <stringProp name="dbUrl">${DB_URL}</stringProp>
+        <stringProp name="driver">org.postgresql.Driver</stringProp>
+        <stringProp name="keepAlive">true</stringProp>
+        <stringProp name="password">${DB_PASSWORD}</stringProp>
+        <stringProp name="poolMax">50</stringProp>
+        <stringProp name="timeout">20000</stringProp>
+        <stringProp name="transactionIsolation">DEFAULT</stringProp>
+        <stringProp name="trimInterval">60000</stringProp>
+        <stringProp name="username">${DB_USERNAME}</stringProp>
+      </JDBCDataSource>
+      <hashTree/>
+
+      <!-- Pattern 1: Peak Hours Simulation (9am-5pm Workday) -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Pattern 1: Peak Hours Simulation" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">-1</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${PEAK_USERS}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">300</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${TEST_DURATION}</stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- High-frequency Peak Operations -->
+        <RandomController guiclass="RandomControlGui" testclass="RandomController" testname="Peak Hours Activities" enabled="true">
+          <intProp name="InterleaveControl.style">1</intProp>
+        </RandomController>
+        <hashTree>
+          <!-- User Dashboard Access (40% of peak activity) -->
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Peak: Dashboard Analytics" enabled="true">
+            <stringProp name="dataSource">postgresql</stringProp>
+            <stringProp name="query">SELECT 
+              COUNT(DISTINCT qs.id) as total_sessions,
+              COUNT(DISTINCT ar.id) as total_assessments,
+              AVG(ar.overall_score) as avg_score,
+              COUNT(CASE WHEN qs.created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as recent_sessions,
+              COUNT(CASE WHEN ar.review_status = 'pending' THEN 1 END) as pending_reviews
+            FROM public.qa_sessions qs
+            LEFT JOIN public.assessment_results ar ON qs.id = ar.session_id
+            WHERE qs.uploaded_by = (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1);</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout">30000</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+
+          <!-- Session Upload Activity (25% of peak activity) -->
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Peak: New Session Upload" enabled="true">
+            <stringProp name="dataSource">postgresql</stringProp>
+            <stringProp name="query">INSERT INTO public.qa_sessions (
+              id, session_name, file_name, file_size, file_url, content_preview,
+              project_id, uploaded_by, analysis_status, created_at, updated_at
+            ) VALUES (
+              gen_random_uuid(),
+              'Peak Hours Session ${__Random(10000,99999)} - ${__time(HH:mm:ss)}',
+              'peak_session_${__threadNum()}_${__Random(1000,9999)}.docx',
+              ${__Random(100000,2000000)},
+              'https://storage.example.com/peak_${__Random(1000,9999)}.docx',
+              'Peak hours session upload for high-volume testing during business hours...',
+              (SELECT id FROM public.projects WHERE slug LIKE 'loadtest-project-%' ORDER BY RANDOM() LIMIT 1),
+              (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+              'uploaded',
+              NOW(),
+              NOW()
+            );</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout">30000</stringProp>
+            <stringProp name="queryType">Update Statement</stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+
+          <!-- Assessment Review Activity (20% of peak activity) -->
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Peak: Assessment Reviews" enabled="true">
+            <stringProp name="dataSource">postgresql</stringProp>
+            <stringProp name="query">SELECT ar.id, ar.assessment_type, ar.overall_score, ar.detailed_feedback,
+                   qs.session_name, qs.file_name, qs.analysis_status,
+                   p.full_name as assessor_name
+            FROM public.assessment_results ar
+            JOIN public.qa_sessions qs ON ar.session_id = qs.id
+            JOIN public.profiles p ON ar.assessor_id = p.id
+            WHERE ar.review_status IN ('pending', 'review')
+              AND qs.created_at > NOW() - INTERVAL '3 days'
+            ORDER BY ar.created_at DESC
+            LIMIT 12;</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout">30000</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+
+          <!-- Project Management Activity (15% of peak activity) -->
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Peak: Project Management" enabled="true">
+            <stringProp name="dataSource">postgresql</stringProp>
+            <stringProp name="query">SELECT p.id, p.name, p.status, p.priority,
+                   COUNT(pm.user_id) as team_members,
+                   COUNT(qs.id) as total_sessions,
+                   COUNT(CASE WHEN qs.analysis_status = 'completed' THEN 1 END) as completed_sessions,
+                   AVG(ar.overall_score) as project_avg_score
+            FROM public.projects p
+            LEFT JOIN public.project_members pm ON p.id = pm.project_id
+            LEFT JOIN public.qa_sessions qs ON p.id = qs.project_id
+            LEFT JOIN public.assessment_results ar ON qs.id = ar.session_id
+            WHERE p.slug LIKE 'loadtest-project-%'
+              AND p.status IN ('active', 'planning')
+            GROUP BY p.id, p.name, p.status, p.priority
+            ORDER BY completed_sessions DESC, project_avg_score DESC;</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="queryTimeout">30000</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+          </JDBCSampler>
+          <hashTree/>
+        </hashTree>
+
+        <!-- Peak Hours Activity Delay -->
+        <UniformRandomTimer guiclass="UniformRandomTimerGui" testclass="UniformRandomTimer" testname="Peak Hours Activity Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">1000</stringProp>
+          <stringProp name="RandomTimer.range">3000</stringProp>
+        </UniformRandomTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Pattern 2: Off-Peak Maintenance Operations -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Pattern 2: Off-Peak Maintenance" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">5</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">8</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">120</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${TEST_DURATION}</stringProp>
+        <stringProp name="ThreadGroup.delay">120</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Maintenance Operations -->
+        
+        <!-- Data Cleanup Operations -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Maintenance: Cleanup Old Sessions" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT 
+            COUNT(*) as sessions_to_cleanup,
+            MIN(created_at) as oldest_session,
+            SUM(file_size::bigint) as total_size_bytes
+          FROM public.qa_sessions 
+          WHERE created_at < NOW() - INTERVAL '30 days'
+            AND analysis_status = 'completed'
+            AND session_name LIKE '%LoadTest%';</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">45000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Analytics and Reporting Queries -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Maintenance: Generate Analytics Report" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">WITH monthly_stats AS (
+            SELECT 
+              DATE_TRUNC('month', qs.created_at) as month,
+              COUNT(DISTINCT qs.id) as sessions_count,
+              COUNT(DISTINCT ar.id) as assessments_count,
+              AVG(ar.overall_score) as avg_quality_score,
+              COUNT(DISTINCT qs.uploaded_by) as active_users
+            FROM public.qa_sessions qs
+            LEFT JOIN public.assessment_results ar ON qs.id = ar.session_id
+            WHERE qs.created_at > NOW() - INTERVAL '6 months'
+              AND qs.session_name LIKE '%LoadTest%'
+            GROUP BY DATE_TRUNC('month', qs.created_at)
+          )
+          SELECT 
+            month,
+            sessions_count,
+            assessments_count,
+            ROUND(avg_quality_score::numeric, 2) as avg_quality_score,
+            active_users,
+            LAG(sessions_count, 1) OVER (ORDER BY month) as prev_month_sessions,
+            ROUND(((sessions_count - LAG(sessions_count, 1) OVER (ORDER BY month))::float / 
+                   NULLIF(LAG(sessions_count, 1) OVER (ORDER BY month), 0) * 100)::numeric, 2) as growth_rate
+          FROM monthly_stats
+          ORDER BY month DESC;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">60000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- System Health Check -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Maintenance: System Health Check" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT 
+            'database_connection' as health_check,
+            CASE WHEN COUNT(*) > 0 THEN 'healthy' ELSE 'error' END as status,
+            COUNT(*) as active_connections,
+            NOW() as check_timestamp
+          FROM pg_stat_activity 
+          WHERE state = 'active'
+          UNION ALL
+          SELECT 
+            'data_integrity' as health_check,
+            CASE WHEN COUNT(*) = 0 THEN 'healthy' ELSE 'warning' END as status,
+            COUNT(*) as orphaned_records,
+            NOW() as check_timestamp
+          FROM public.assessment_results ar
+          LEFT JOIN public.qa_sessions qs ON ar.session_id = qs.id
+          WHERE qs.id IS NULL;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">45000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Maintenance Delay -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Maintenance Operation Delay" enabled="true">
+          <stringProp name="ConstantTimer.delay">15000</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Pattern 3: Incremental Stress Testing -->
+      <ThreadGroup guiclass="SteppingThreadGroup" testclass="kg.apc.jmeter.threads.SteppingThreadGroup" testname="Pattern 3: Incremental Stress Test" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <stringProp name="Threads initial delay">0</stringProp>
+        <stringProp name="Start users count">10</stringProp>
+        <stringProp name="Start users count burst">5</stringProp>
+        <stringProp name="Start users period">30</stringProp>
+        <stringProp name="Stop users count">5</stringProp>
+        <stringProp name="Stop users period">20</stringProp>
+        <stringProp name="flighttime">60</stringProp>
+        <stringProp name="rampUp">10</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">-1</intProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Stress Test Workload -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Stress: Concurrent Session Processing" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">WITH random_session AS (
+            SELECT id, session_name, analysis_status 
+            FROM public.qa_sessions 
+            WHERE session_name LIKE '%LoadTest%'
+              AND analysis_status IN ('uploaded', 'analyzing')
+            ORDER BY RANDOM() 
+            LIMIT 1
+          )
+          UPDATE public.qa_sessions 
+          SET analysis_status = CASE 
+                WHEN analysis_status = 'uploaded' THEN 'analyzing'
+                WHEN analysis_status = 'analyzing' THEN 'completed'
+                ELSE analysis_status
+              END,
+              analysis_results = CASE 
+                WHEN analysis_status = 'uploaded' THEN json_build_object(
+                  'stress_test_id', ${__threadNum()},
+                  'processing_started', NOW(),
+                  'load_level', '${__Random(1,5)}'
+                )
+                WHEN analysis_status = 'analyzing' THEN analysis_results || json_build_object(
+                  'processing_completed', NOW(),
+                  'final_score', ${__Random(60,95)},
+                  'thread_id', ${__threadNum()}
+                )
+                ELSE analysis_results
+              END,
+              updated_at = NOW()
+          WHERE id = (SELECT id FROM random_session);</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Stress Test Assessment Creation -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Stress: Rapid Assessment Creation" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.assessment_results (
+            id, session_id, assessor_id, assessment_type, overall_score, mqm_score,
+            evaluation_criteria, detailed_feedback, review_status, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid(),
+            (SELECT id FROM public.qa_sessions WHERE session_name LIKE '%LoadTest%' AND analysis_status = 'completed' ORDER BY RANDOM() LIMIT 1),
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+            'stress_test',
+            ${__Random(65,90)},
+            ${__Random(2,5)}.${__Random(0,9)},
+            json_build_object(
+              'stress_level', ${__threadNum()},
+              'concurrent_assessments', 'true',
+              'load_timestamp', NOW()
+            ),
+            'Stress test assessment #${__threadNum()} - Concurrent processing evaluation',
+            CASE WHEN ${__Random(1,10)} > 7 THEN 'approved' ELSE 'pending' END,
+            NOW(),
+            NOW()
+          );</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Minimal Stress Test Delay -->
+        <UniformRandomTimer guiclass="UniformRandomTimerGui" testclass="UniformRandomTimer" testname="Stress Test Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">500</stringProp>
+          <stringProp name="RandomTimer.range">1500</stringProp>
+        </UniformRandomTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Pattern 4: Burst Load Testing -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Pattern 4: Burst Load Test" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">8</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">75</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">15</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">120</stringProp>
+        <stringProp name="ThreadGroup.delay">600</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Burst Load Operations -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Burst: Rapid Query Execution" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT 
+            p.id, p.email, p.full_name, p.role,
+            o.name as organization,
+            COUNT(pm.project_id) as project_count,
+            COUNT(qs.id) as session_count,
+            MAX(p.last_activity_at) as last_activity
+          FROM public.profiles p
+          JOIN public.organizations o ON p.organization_id = o.id
+          LEFT JOIN public.project_members pm ON p.id = pm.user_id
+          LEFT JOIN public.qa_sessions qs ON p.id = qs.uploaded_by
+          WHERE p.email LIKE 'loadtest_%'
+          GROUP BY p.id, p.email, p.full_name, p.role, o.name
+          ORDER BY session_count DESC, last_activity DESC
+          LIMIT 15;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">15000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Burst Feedback Creation -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Burst: Rapid Feedback Submission" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.user_feedback (
+            id, target_type, target_id, user_id, feedback_type, rating, title, description, status, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid(),
+            'system',
+            'burst_load_test',
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+            'performance',
+            ${__Random(1,5)},
+            'Burst Load Feedback ${__threadNum()}-${__Random(100,999)}',
+            'Burst load test feedback generated during high-traffic simulation at ${__time(yyyy-MM-dd HH:mm:ss)}. Thread ${__threadNum()} of burst test.',
+            'open',
+            NOW(),
+            NOW()
+          );</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">15000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Minimal Burst Delay -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Burst Execution Delay" enabled="true">
+          <stringProp name="ConstantTimer.delay">200</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Results Collection for Load Patterns -->
+      <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Load Pattern Summary" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <n>saveConfig</n>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename">scripts/load-testing/results/load-pattern-scenarios.jtl</stringProp>
+      </ResultCollector>
+      <hashTree/>
+
+      <!-- Performance Thresholds Listener -->
+      <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="Load Pattern Performance" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <n>saveConfig</n>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename">scripts/load-testing/results/load-pattern-performance.jtl</stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan> 

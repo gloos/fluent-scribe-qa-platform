@@ -1,0 +1,28 @@
+Database Load Test Summary
+==========================
+
+Test Execution Details:
+- Start Time: Tue Jun  3 19:45:59 BST 2025
+- End Time: Tue Jun  3 19:47:13 BST 2025
+- Duration: 74s
+- Configuration: database-config.properties
+- Test Plan: database-load-test.jmx
+
+Test Parameters:
+- Concurrent Users: 10
+- Ramp-up Period: 60s
+- Test Duration: 300s
+- Database: Not specified
+
+Results Location: results/test_run_20250603_194243
+- Detailed Results: test_results.jtl
+- HTML Dashboard: html_report/index.html
+- JMeter Log: jmeter.log
+
+Next Steps:
+1. Review HTML dashboard for detailed metrics
+2. Analyze response times and throughput
+3. Check for errors in JMeter log
+4. Compare results against performance thresholds
+5. Identify optimization opportunities
+

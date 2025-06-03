@@ -7,15 +7,28 @@ import morgan from 'morgan';
 import multer from 'multer';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
+import cluster from 'cluster';
 import { ApiAuthMiddleware, AuthenticatedRequest } from '../lib/middleware/apiAuthMiddleware';
 import { RateLimitMiddleware } from '../lib/middleware/rateLimitMiddleware';
 import { ApiKeyService } from '../lib/services/apiKeyService';
 import { ApiVersionMiddleware, VersionedRequest } from '../lib/middleware/apiVersionMiddleware';
 import { ApiVersionConfiguration } from '../lib/config/apiVersionConfig';
 import { securityRouter } from './routes/security';
+import { monitoringRouter } from './routes/monitoring';
+import { cdnRouter } from './routes/cdn';
+import { MonitoringWebSocketServer } from './websocketServer';
+import { createServer } from 'http';
+import { autoscalingIntegration } from '../services/autoscalingIntegration';
+import { cdnService } from '../services/cdnService';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Create HTTP server instance
+const server = createServer(app);
+
+// Initialize WebSocket server for monitoring
+let wsServer: MonitoringWebSocketServer | null = null;
 
 // Configure multer for file uploads
 const upload = multer({
@@ -373,6 +386,12 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Initialize and configure CDN service
+cdnService.initialize();
+
+// Add CDN middleware for static asset delivery and caching
+app.use(cdnService.createStaticMiddleware());
+
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs, {
   customCss: '.swagger-ui .topbar { display: none }',
@@ -399,11 +418,22 @@ app.use(ApiAuthMiddleware.recordResponse());
 // API Versioning middleware - applies to all /api/* routes
 app.use('/api', ApiVersionMiddleware.extractVersion);
 
+// Initialize autoscaling integration
+autoscalingIntegration.initialize();
+
+// Add autoscaling middleware for load balancing and response time tracking
+app.use(autoscalingIntegration.createMiddleware());
+
+// Add autoscaling management routes
+autoscalingIntegration.addRoutes(app);
+
 // API routes
 // app.use('/api/v1/qa', qaSessionRouter);
 // app.use('/api/v1/files', fileUploadRouter);
 // app.use('/api/v1/transcription', transcriptionRouter);
 app.use('/api/v1/security', securityRouter);
+app.use('/api/v1/monitoring', monitoringRouter);
+app.use('/api/v1/cdn', cdnRouter);
 
 /**
  * @swagger
@@ -1905,8 +1935,8 @@ app.use((req, res) => {
 
 // Start server (check if this file is being run directly)
 const isMain = process.argv[1] && process.argv[1].endsWith('app.ts');
-if (isMain || process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+if ((isMain || process.env.NODE_ENV !== 'test') && cluster.isPrimary) {
+  server.listen(PORT, () => {
     console.log(`🚀 API server running on port ${PORT}`);
     console.log(`📚 Health check: http://localhost:${PORT}/api/v1/health`);
     console.log(`🔐 Authentication: JWT Bearer tokens and X-API-Key headers supported`);
@@ -1915,7 +1945,48 @@ if (isMain || process.env.NODE_ENV !== 'test') {
     console.log(`   • Auth endpoints: 10 requests/15min per IP`);
     console.log(`   • User endpoints: 1000 requests/hour per user`);
     console.log(`   • API keys: Custom limits per key + usage tracking`);
+    console.log(`📊 Monitoring: Resource monitoring API available at /api/v1/monitoring`);
+    
+    // Initialize WebSocket server for real-time monitoring
+    try {
+      wsServer = new MonitoringWebSocketServer(server);
+      console.log(`🔄 WebSocket: Real-time monitoring available at ws://localhost:${PORT}/api/v1/monitoring/ws`);
+    } catch (error) {
+      console.error('Failed to initialize WebSocket server:', error);
+    }
   });
+} else if (!cluster.isPrimary) {
+  console.log(`🔧 Worker process ${process.pid} initialized (cluster worker ${cluster.worker?.id})`);
 }
 
-export default app; 
+// Graceful shutdown handling
+const gracefulShutdown = async () => {
+  console.log('Shutting down gracefully...');
+  
+  // Shutdown autoscaling system
+  try {
+    await autoscalingIntegration.gracefulShutdown();
+    console.log('Autoscaling system shut down');
+  } catch (error) {
+    console.error('Error shutting down autoscaling system:', error);
+  }
+  
+  if (wsServer) {
+    wsServer.close();
+  }
+  
+  if (cluster.isPrimary) {
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+export default app;
+export { server };

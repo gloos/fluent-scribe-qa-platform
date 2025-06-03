@@ -1,0 +1,50 @@
+{
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 100,
+    "errorCount" : 100,
+    "errorPct" : 100.0,
+    "meanResTime" : 1.5600000000000007,
+    "medianResTime" : 1.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 11.0,
+    "pct1ResTime" : 3.0,
+    "pct2ResTime" : 4.0,
+    "pct3ResTime" : 10.949999999999974,
+    "throughput" : 1.6133195663397006,
+    "receivedKBytesPerSec" : 0.08350189161719153,
+    "sentKBytesPerSec" : 0.0
+  },
+  "Update User Activity" : {
+    "transaction" : "Update User Activity",
+    "sampleCount" : 50,
+    "errorCount" : 50,
+    "errorPct" : 100.0,
+    "meanResTime" : 1.4799999999999998,
+    "medianResTime" : 1.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 11.0,
+    "pct1ResTime" : 3.0,
+    "pct2ResTime" : 4.449999999999996,
+    "pct3ResTime" : 11.0,
+    "throughput" : 0.8336946009937639,
+    "receivedKBytesPerSec" : 0.04315020884049755,
+    "sentKBytesPerSec" : 0.0
+  },
+  "Insert User Feedback" : {
+    "transaction" : "Insert User Feedback",
+    "sampleCount" : 50,
+    "errorCount" : 50,
+    "errorPct" : 100.0,
+    "meanResTime" : 1.64,
+    "medianResTime" : 1.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 6.0,
+    "pct1ResTime" : 3.8999999999999986,
+    "pct2ResTime" : 4.449999999999996,
+    "pct3ResTime" : 6.0,
+    "throughput" : 0.8336390009670213,
+    "receivedKBytesPerSec" : 0.0431473311047384,
+    "sentKBytesPerSec" : 0.0
+  }
+}

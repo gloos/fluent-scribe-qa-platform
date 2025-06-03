@@ -1,12 +1,10 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Lock, Settings, Shield } from 'lucide-react';
+import { User, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRBAC } from '@/hooks/useRBAC';
 import { ProfileForm } from '@/components/profile/ProfileForm';
-import { PasswordChangeForm } from '@/components/profile/PasswordChangeForm';
-import { PreferencesForm } from '@/components/profile/PreferencesForm';
-import { SecurityInfo } from '@/components/profile/SecurityInfo';
+import { AccountSettingsManager } from '@/components/profile/AccountSettingsManager';
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
@@ -29,7 +27,8 @@ const Profile: React.FC = () => {
     lastName: userProfile?.full_name?.split(' ').slice(1).join(' ') || '',
     email: user.email || '',
     phone: userProfile?.phone || '',
-    bio: userProfile?.bio || ''
+    bio: userProfile?.bio || '',
+    avatarUrl: userProfile?.avatar_url || ''
   };
 
   return (
@@ -42,22 +41,14 @@ const Profile: React.FC = () => {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
-            Profile
+            Profile Information
           </TabsTrigger>
-          <TabsTrigger value="password" className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            Password
-          </TabsTrigger>
-          <TabsTrigger value="preferences" className="flex items-center gap-2">
+          <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Preferences
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Security
+            Account Settings
           </TabsTrigger>
         </TabsList>
 
@@ -69,16 +60,8 @@ const Profile: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="password" className="space-y-6">
-          <PasswordChangeForm userId={user.id} />
-        </TabsContent>
-
-        <TabsContent value="preferences" className="space-y-6">
-          <PreferencesForm userId={user.id} />
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <SecurityInfo userId={user.id} />
+        <TabsContent value="settings" className="space-y-6">
+          <AccountSettingsManager userId={user.id} />
         </TabsContent>
       </Tabs>
     </div>

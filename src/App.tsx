@@ -23,6 +23,7 @@ import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import SecurityAdmin from '@/pages/SecurityAdmin';
 import FeedbackDemo from './pages/FeedbackDemo';
 import QAErrors from './pages/QAErrors';
+import Monitoring from './pages/Monitoring';
 import PermissionDemo from './components/demo/PermissionDemo';
 import { UserRole, Permission } from '@/lib/rbac';
 
@@ -106,6 +107,11 @@ const App = () => (
           <Route path="/demo/permissions" element={
             <RoleProtectedRoute requiredPermission={Permission.VIEW_USERS}>
               <PermissionDemo />
+            </RoleProtectedRoute>
+          } />
+          <Route path="/demo/monitoring" element={
+            <RoleProtectedRoute requiredPermission={Permission.VIEW_REPORTS}>
+              <Monitoring />
             </RoleProtectedRoute>
           } />
           

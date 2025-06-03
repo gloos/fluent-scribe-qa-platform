@@ -1,6 +1,6 @@
 # Task ID: 22
 # Title: Implement Custom Scoring Models
-# Status: pending
+# Status: done
 # Dependencies: None
 # Priority: medium
 # Description: Allow users to define custom scoring models for quality assessment.

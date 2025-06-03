@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="User Journey Scenarios Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments">Comprehensive user journey scenarios for realistic load testing</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="DB_URL" elementType="Argument">
+            <stringProp name="Argument.name">DB_URL</stringProp>
+            <stringProp name="Argument.value">jdbc:postgresql://aws-0-us-west-1.pooler.supabase.com:6543/postgres</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="DB_USERNAME" elementType="Argument">
+            <stringProp name="Argument.name">DB_USERNAME</stringProp>
+            <stringProp name="Argument.value">postgres.uqprvrrncpqhpfxafeuc</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="DB_PASSWORD" elementType="Argument">
+            <stringProp name="Argument.name">DB_PASSWORD</stringProp>
+            <stringProp name="Argument.value">${__P(db.password,YOUR_SERVICE_ROLE_KEY_HERE)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="SCENARIO_THREADS" elementType="Argument">
+            <stringProp name="Argument.name">SCENARIO_THREADS</stringProp>
+            <stringProp name="Argument.value">${__P(scenario.threads,15)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="SCENARIO_DURATION" elementType="Argument">
+            <stringProp name="Argument.name">SCENARIO_DURATION</stringProp>
+            <stringProp name="Argument.value">${__P(scenario.duration,600)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="PostgreSQL Connection" enabled="true">
+        <boolProp name="autocommit">true</boolProp>
+        <stringProp name="checkQuery">SELECT 1</stringProp>
+        <stringProp name="connectionAge">5000</stringProp>
+        <stringProp name="dataSource">postgresql</stringProp>
+        <stringProp name="dbUrl">${DB_URL}</stringProp>
+        <stringProp name="driver">org.postgresql.Driver</stringProp>
+        <stringProp name="keepAlive">true</stringProp>
+        <stringProp name="password">${DB_PASSWORD}</stringProp>
+        <stringProp name="poolMax">20</stringProp>
+        <stringProp name="timeout">15000</stringProp>
+        <stringProp name="transactionIsolation">DEFAULT</stringProp>
+        <stringProp name="trimInterval">60000</stringProp>
+        <stringProp name="username">${DB_USERNAME}</stringProp>
+      </JDBCDataSource>
+      <hashTree/>
+
+      <!-- Journey 1: Complete QA Workflow -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Journey 1: Complete QA Workflow" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">3</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${SCENARIO_THREADS}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">120</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${SCENARIO_DURATION}</stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Step 1: User Login & Profile Check -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 1: User Profile Access" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT p.id, p.email, p.full_name, p.role, p.organization_id, 
+                 o.name as org_name, o.subscription_tier, o.settings->>'preferences' as user_preferences
+          FROM public.profiles p
+          JOIN public.organizations o ON p.organization_id = o.id
+          WHERE p.email LIKE 'loadtest_%' 
+            AND p.status = 'active'
+          ORDER BY p.last_login_at DESC
+          LIMIT 1;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable">user_info</stringProp>
+          <stringProp name="variableNames">user_id,user_email,user_name,user_role,org_id</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 2: Check Available Projects -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 2: Load User Projects" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT p.id, p.name, p.description, p.status, p.priority,
+                 COUNT(pm.user_id) as team_size,
+                 COUNT(qs.id) as active_sessions
+          FROM public.projects p
+          LEFT JOIN public.project_members pm ON p.id = pm.project_id
+          LEFT JOIN public.qa_sessions qs ON p.id = qs.project_id AND qs.analysis_status != 'completed'
+          WHERE p.slug LIKE 'loadtest-project-%'
+            AND p.status IN ('active', 'planning')
+          GROUP BY p.id, p.name, p.description, p.status, p.priority
+          ORDER BY p.priority DESC, p.created_at DESC
+          LIMIT 5;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable">projects</stringProp>
+          <stringProp name="variableNames">project_id</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 3: Create New QA Session -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 3: Create QA Session" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.qa_sessions (
+            id, session_name, file_name, file_size, file_url, content_preview,
+            project_id, uploaded_by, analysis_status, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid(),
+            'Journey Session ${__Random(10000,99999)} - ${__time(yyyy-MM-dd HH:mm:ss)}',
+            'journey_test_${__threadNum()}_${__Random(1000,9999)}.txt',
+            ${__Random(50000,500000)},
+            'https://test-storage.example.com/journey_${__Random(1000,9999)}.txt',
+            'This is a comprehensive QA workflow test session created during journey testing...',
+            (SELECT id FROM public.projects WHERE slug LIKE 'loadtest-project-%' ORDER BY RANDOM() LIMIT 1),
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+            'uploaded',
+            NOW(),
+            NOW()
+          ) RETURNING id;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable">session_info</stringProp>
+          <stringProp name="variableNames">session_id</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 4: Simulate Analysis Processing -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Analysis Processing Delay" enabled="true">
+          <stringProp name="ConstantTimer.delay">${__Random(2000,5000)}</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+
+        <!-- Step 5: Update Session Analysis Status -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 5: Update Analysis Status" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">UPDATE public.qa_sessions 
+          SET analysis_status = 'analyzing',
+              analysis_results = json_build_object(
+                'segments_identified', ${__Random(5,25)},
+                'quality_score', ${__Random(70,95)},
+                'analysis_duration', ${__Random(15,120)},
+                'detected_issues', ARRAY['terminology_inconsistency', 'formatting_issue']
+              ),
+              updated_at = NOW()
+          WHERE session_name LIKE 'Journey Session %${__threadNum()}%';</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 6: Create Assessment Result -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 6: Create Assessment" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.assessment_results (
+            id, session_id, assessor_id, assessment_type, overall_score, mqm_score,
+            evaluation_criteria, detailed_feedback, review_status, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid(),
+            (SELECT id FROM public.qa_sessions WHERE session_name LIKE 'Journey Session %${__threadNum()}%' ORDER BY created_at DESC LIMIT 1),
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' AND role = 'assessor' ORDER BY RANDOM() LIMIT 1),
+            'comprehensive',
+            ${__Random(75,95)},
+            ${__Random(3,5)}.${__Random(0,9)},
+            json_build_object(
+              'accuracy', ${__Random(80,95)},
+              'fluency', ${__Random(75,90)},
+              'terminology', ${__Random(70,95)},
+              'consistency', ${__Random(80,100)}
+            ),
+            'Comprehensive assessment completed during journey testing. Quality metrics evaluated across multiple dimensions.',
+            'approved',
+            NOW(),
+            NOW()
+          );</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 7: Generate Audit Log Entry -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 7: Log Assessment Activity" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.audit_logs (
+            id, user_id, actor_email, event_type, resource_type, resource_id,
+            action, result, risk_level, ip_address, user_agent, session_id, created_at
+          ) VALUES (
+            gen_random_uuid(),
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+            (SELECT email FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1),
+            'assessment_created',
+            'qa_session',
+            (SELECT id FROM public.qa_sessions WHERE session_name LIKE 'Journey Session %${__threadNum()}%' ORDER BY created_at DESC LIMIT 1),
+            'CREATE',
+            'success',
+            'low',
+            '192.168.1.${__Random(10,254)}',
+            'LoadTest-UserAgent/1.0 (Journey Testing)',
+            'journey_session_${__threadNum()}_${__Random(1000,9999)}',
+            NOW()
+          );</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Step 8: Final Session Completion -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Step 8: Complete Session" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">UPDATE public.qa_sessions 
+          SET analysis_status = 'completed',
+              completion_notes = 'Journey workflow completed successfully. All assessment criteria met.',
+              updated_at = NOW()
+          WHERE session_name LIKE 'Journey Session %${__threadNum()}%';</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Journey Completion Delay -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Journey Completion Pause" enabled="true">
+          <stringProp name="ConstantTimer.delay">${__Random(3000,8000)}</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Journey 2: Multi-User Collaboration Scenario -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Journey 2: Multi-User Collaboration" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">2</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">12</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">90</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${SCENARIO_DURATION}</stringProp>
+        <stringProp name="ThreadGroup.delay">30</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Concurrent Assessment Reviews -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Collaborative: Review Pending Assessments" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT ar.id, ar.assessment_type, ar.overall_score, ar.review_status,
+                 qs.session_name, qs.file_name, qs.analysis_status,
+                 p.full_name as assessor_name, p.role as assessor_role
+          FROM public.assessment_results ar
+          JOIN public.qa_sessions qs ON ar.session_id = qs.id
+          JOIN public.profiles p ON ar.assessor_id = p.id
+          WHERE ar.review_status IN ('pending', 'review')
+            AND qs.session_name LIKE '%LoadTest%'
+          ORDER BY ar.created_at DESC
+          LIMIT 8;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Add Review Feedback -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Collaborative: Add Review Feedback" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.user_feedback (
+            id, target_type, target_id, user_id, feedback_type, rating, title, description, status, created_at, updated_at
+          ) VALUES (
+            gen_random_uuid(),
+            'assessment',
+            (SELECT id FROM public.assessment_results WHERE review_status = 'pending' ORDER BY RANDOM() LIMIT 1),
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' AND role = 'reviewer' ORDER BY RANDOM() LIMIT 1),
+            'review',
+            ${__Random(3,5)},
+            'Collaborative Review ${__Random(1000,9999)}',
+            'Multi-user collaboration feedback: Assessment quality is ${__Random(70,95)}%. Recommendations for improvement provided.',
+            'open',
+            NOW(),
+            NOW()
+          );</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Update Assessment Status Based on Collaboration -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Collaborative: Update Assessment Status" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">UPDATE public.assessment_results 
+          SET review_status = CASE 
+                WHEN ${__Random(1,10)} > 7 THEN 'approved'
+                WHEN ${__Random(1,10)} > 4 THEN 'requires_revision'
+                ELSE 'rejected'
+              END,
+              detailed_feedback = detailed_feedback || ' [COLLABORATIVE UPDATE: Multi-user review completed at ' || NOW() || ']',
+              updated_at = NOW()
+          WHERE id = (SELECT id FROM public.assessment_results WHERE review_status = 'pending' ORDER BY RANDOM() LIMIT 1);</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Collaboration Delay -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Collaboration Interaction Delay" enabled="true">
+          <stringProp name="ConstantTimer.delay">${__Random(1500,4000)}</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Journey 3: Organization Management Workflow -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Journey 3: Organization Management" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlGui" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <intProp name="LoopController.loops">1</intProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">8</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">60</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${SCENARIO_DURATION}</stringProp>
+        <stringProp name="ThreadGroup.delay">60</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- Organization Analytics Query -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Org Management: Analytics Dashboard" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">SELECT 
+            o.name as organization_name,
+            o.subscription_tier,
+            COUNT(DISTINCT p.id) as total_users,
+            COUNT(DISTINCT pr.id) as total_projects,
+            COUNT(DISTINCT qs.id) as total_sessions,
+            AVG(ar.overall_score) as avg_quality_score,
+            COUNT(CASE WHEN p.last_login_at > NOW() - INTERVAL '7 days' THEN 1 END) as active_users_week
+          FROM public.organizations o
+          LEFT JOIN public.profiles p ON o.id = p.organization_id
+          LEFT JOIN public.projects pr ON o.id = pr.organization_id
+          LEFT JOIN public.qa_sessions qs ON pr.id = qs.project_id
+          LEFT JOIN public.assessment_results ar ON qs.id = ar.session_id
+          WHERE o.slug LIKE 'loadtest-org-%'
+          GROUP BY o.id, o.name, o.subscription_tier
+          ORDER BY total_sessions DESC;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- User Role Management -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Org Management: User Role Updates" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">UPDATE public.profiles 
+          SET role = CASE 
+                WHEN role = 'user' AND ${__Random(1,10)} > 8 THEN 'assessor'
+                WHEN role = 'assessor' AND ${__Random(1,10)} > 9 THEN 'admin'
+                ELSE role
+              END,
+              updated_at = NOW()
+          WHERE email LIKE 'loadtest_%' 
+            AND id = (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' ORDER BY RANDOM() LIMIT 1);</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Project Assignment Management -->
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Org Management: Project Assignments" enabled="true">
+          <stringProp name="dataSource">postgresql</stringProp>
+          <stringProp name="query">INSERT INTO public.project_members (
+            project_id, user_id, role, permissions, assigned_at, assigned_by
+          ) 
+          SELECT 
+            p.id as project_id,
+            prof.id as user_id,
+            CASE WHEN prof.role = 'admin' THEN 'project_manager' 
+                 WHEN prof.role = 'assessor' THEN 'assessor'
+                 ELSE 'contributor' END as role,
+            json_build_object('read', true, 'write', true, 'review', prof.role != 'user') as permissions,
+            NOW() as assigned_at,
+            (SELECT id FROM public.profiles WHERE email LIKE 'loadtest_%' AND role = 'admin' ORDER BY RANDOM() LIMIT 1) as assigned_by
+          FROM public.projects p
+          CROSS JOIN (
+            SELECT id, role FROM public.profiles 
+            WHERE email LIKE 'loadtest_%' 
+            ORDER BY RANDOM() 
+            LIMIT 1
+          ) prof
+          WHERE p.slug LIKE 'loadtest-project-%'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.project_members pm 
+              WHERE pm.project_id = p.id AND pm.user_id = prof.id
+            )
+          ORDER BY RANDOM()
+          LIMIT 2;</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="queryTimeout">30000</stringProp>
+          <stringProp name="queryType">Update Statement</stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+        </JDBCSampler>
+        <hashTree/>
+
+        <!-- Management Activity Delay -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Management Activity Pause" enabled="true">
+          <stringProp name="ConstantTimer.delay">${__Random(4000,7000)}</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+      </hashTree>
+
+      <!-- Results Collection -->
+      <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Journey Scenarios Summary" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <n>saveConfig</n>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename">scripts/load-testing/results/journey-scenarios.jtl</stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan> 

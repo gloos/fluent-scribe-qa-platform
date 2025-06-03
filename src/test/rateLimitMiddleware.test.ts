@@ -31,13 +31,14 @@ const createMockResponse = (): Partial<Response> => {
 };
 
 const createMockNext = (): NextFunction => {
-  return () => {};
+  return vi.fn() as any;
 };
 
 describe('RateLimitMiddleware', () => {
   beforeEach(() => {
     // Clear any existing rate limit data between tests
     vi.clearAllMocks();
+    RateLimitMiddleware.clearStore();
   });
 
   describe('Basic Rate Limiting', () => {

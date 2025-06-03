@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { User, Save } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { User, Save, Upload, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,7 @@ interface ProfileFormData {
   email: string;
   phone?: string;
   bio?: string;
+  avatarUrl?: string;
 }
 
 interface ProfileFormProps {
@@ -30,7 +32,9 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 }) => {
   const [formData, setFormData] = useState(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -63,6 +67,114 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     }
   };
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please select an image file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      // Create a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('user-avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('user-avatars')
+        .getPublicUrl(filePath);
+
+      if (urlData?.publicUrl) {
+        // Update form data with new avatar URL
+        setFormData(prev => ({ ...prev, avatarUrl: urlData.publicUrl }));
+        setAvatarPreview(urlData.publicUrl);
+        
+        toast({
+          title: "Avatar Uploaded",
+          description: "Your avatar has been uploaded successfully.",
+          variant: "default"
+        });
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload avatar.";
+      toast({
+        title: "Upload Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!formData.avatarUrl) return;
+
+    try {
+      // Extract filename from URL to delete from storage
+      const url = new URL(formData.avatarUrl);
+      const pathSegments = url.pathname.split('/');
+      const fileName = pathSegments[pathSegments.length - 1];
+      
+      if (fileName && fileName.includes(userId)) {
+        // Only delete if it's this user's avatar
+        await supabase.storage
+          .from('user-avatars')
+          .remove([`avatars/${fileName}`]);
+      }
+
+      setFormData(prev => ({ ...prev, avatarUrl: '' }));
+      setAvatarPreview(null);
+
+      toast({
+        title: "Avatar Removed",
+        description: "Your avatar has been removed.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Error removing avatar:', error);
+      // Still update the form even if storage deletion fails
+      setFormData(prev => ({ ...prev, avatarUrl: '' }));
+      setAvatarPreview(null);
+    }
+  };
+
+  const getUserInitials = () => {
+    const firstInitial = formData.firstName.charAt(0).toUpperCase();
+    const lastInitial = formData.lastName.charAt(0).toUpperCase();
+    return `${firstInitial}${lastInitial}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -77,11 +189,14 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         .from('profiles')
         .update({
           full_name: fullName,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           phone: formData.phone || null,
           bio: formData.bio || null,
+          avatar_url: formData.avatarUrl || null,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', userId);
+        .eq('id', userId);
 
       if (error) throw error;
 
@@ -104,6 +219,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     }
   };
 
+  const currentAvatarUrl = avatarPreview || formData.avatarUrl;
+
   return (
     <Card>
       <CardHeader>
@@ -113,7 +230,57 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Avatar Section */}
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={currentAvatarUrl} alt="Profile avatar" />
+                <AvatarFallback className="text-lg">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
+              {currentAvatarUrl && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                  onClick={handleRemoveAvatar}
+                  disabled={isUploadingAvatar || isSubmitting}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={isUploadingAvatar || isSubmitting}
+                className="hidden"
+                id="avatar-upload"
+              />
+              <Label
+                htmlFor="avatar-upload"
+                className={cn(
+                  "cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium",
+                  "bg-primary text-primary-foreground hover:bg-primary/90",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  (isUploadingAvatar || isSubmitting) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                {isUploadingAvatar ? 'Uploading...' : 'Change Avatar'}
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              JPG, PNG or GIF (max 5MB)
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
@@ -185,7 +352,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
             />
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="w-full">
+          <Button type="submit" disabled={isSubmitting || isUploadingAvatar} className="w-full">
             {isSubmitting ? (
               <>Updating...</>
             ) : (

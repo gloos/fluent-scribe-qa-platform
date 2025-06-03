@@ -270,6 +270,11 @@ export class TaxCalculationService {
 
     if (error) {
       console.error('Error fetching tax rates:', error);
+      throw new Error(`Failed to fetch tax rates: ${error.message}`);
+    }
+
+    // Handle case where data is null (no rates found)
+    if (!data) {
       return [];
     }
 
@@ -318,6 +323,11 @@ export class TaxCalculationService {
 
     if (error) {
       console.error('Error fetching tax exemptions:', error);
+      throw new Error(`Failed to fetch tax exemptions: ${error.message}`);
+    }
+
+    // Handle case where data is null (no exemptions found)
+    if (!data) {
       return [];
     }
 

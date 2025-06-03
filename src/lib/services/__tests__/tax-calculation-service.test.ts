@@ -457,9 +457,8 @@ describe('TaxCalculationService', () => {
       expect(result2.success).toBe(true);
       expect(result2.total_tax_amount).toBe(result1.total_tax_amount);
       
-      // Should not have made additional DB calls for tax rates
-      // (might still call for exemptions, but fewer calls overall)
-      expect(fromSpy).toHaveBeenCalledTimes(1); // Only exemptions call
+      // Should not have made any additional DB calls - cache should provide everything
+      expect(fromSpy).toHaveBeenCalledTimes(0); // Complete cache hit
     });
 
     it('should handle errors gracefully', async () => {

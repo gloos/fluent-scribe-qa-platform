@@ -81,6 +81,13 @@ class MemoryRateLimitStore {
       }
     }
   }
+
+  /**
+   * Clear all stored rate limit data (for testing)
+   */
+  clear(): void {
+    this.store.clear();
+  }
 }
 
 /**
@@ -242,5 +249,12 @@ export class RateLimitMiddleware {
     };
     
     return this.create(fullConfig);
+  }
+
+  /**
+   * Clear the rate limit store (for testing purposes)
+   */
+  static clearStore(): void {
+    this.store.clear();
   }
 } 
