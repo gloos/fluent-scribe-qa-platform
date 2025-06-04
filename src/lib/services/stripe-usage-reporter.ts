@@ -1,11 +1,7 @@
 import { StripeService } from '@/integrations/stripe/stripe-service';
 import { createClient } from '@supabase/supabase-js';
 import type { BillingUsageRecord, BillingSubscription } from '@/lib/types/billing';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from '@/lib/supabase';
 
 export interface StripeUsageReportResult {
   success: boolean;

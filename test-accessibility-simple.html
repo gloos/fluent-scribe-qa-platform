@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            max-width: 800px;
+        }
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: #000;
+            color: #fff;
+            padding: 8px;
+            text-decoration: none;
+        }
+        .skip-link:focus {
+            top: 6px;
+        }
+        button:focus, input:focus {
+            outline: 2px solid #0066cc;
+            outline-offset: 2px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #0066cc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0052a3;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+        }
+        .tabs {
+            border-bottom: 1px solid #ccc;
+        }
+        .tab {
+            background: none;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab[aria-selected="true"] {
+            border-bottom-color: #0066cc;
+            font-weight: bold;
+        }
+        .tab-panel {
+            padding: 20px;
+            display: none;
+        }
+        .tab-panel[aria-hidden="false"] {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <header role="banner">
+        <h1>Accessibility Test Page</h1>
+        <nav role="navigation" aria-label="Main navigation">
+            <ul>
+                <li><a href="#home">Home</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="main-content" role="main">
+        <section>
+            <h2>Form Testing</h2>
+            <form>
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" required aria-required="true">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" name="email" required aria-required="true">
+                </div>
+                
+                <div class="form-group">
+                    <label for="country">Country</label>
+                    <select id="country" name="country">
+                        <option value="">Select a country</option>
+                        <option value="us">United States</option>
+                        <option value="ca">Canada</option>
+                        <option value="uk">United Kingdom</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message" rows="4"></textarea>
+                </div>
+                
+                <button type="submit">Submit Form</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Interactive Elements</h2>
+            <button onclick="openModal()">Open Modal</button>
+            <button onclick="toggleContent()">Toggle Content</button>
+            
+            <div id="toggleable-content" style="display: none;">
+                <p>This content can be toggled on and off.</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>Images</h2>
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pgo8L3N2Zz4K" alt="Sample image for accessibility testing" width="200" height="100">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkRlY29yYXRpdmU8L3RleHQ+Cjwvc3ZnPgo=" alt="" role="presentation" width="200" height="100">
+        </section>
+
+        <section>
+            <h2>Tab Interface</h2>
+            <div role="tablist" class="tabs">
+                <button role="tab" class="tab" aria-selected="true" aria-controls="tab1" id="tab1-btn">Tab 1</button>
+                <button role="tab" class="tab" aria-selected="false" aria-controls="tab2" id="tab2-btn">Tab 2</button>
+                <button role="tab" class="tab" aria-selected="false" aria-controls="tab3" id="tab3-btn">Tab 3</button>
+            </div>
+            <div role="tabpanel" class="tab-panel" id="tab1" aria-labelledby="tab1-btn" aria-hidden="false">
+                <h3>Tab 1 Content</h3>
+                <p>This is the content for the first tab.</p>
+            </div>
+            <div role="tabpanel" class="tab-panel" id="tab2" aria-labelledby="tab2-btn" aria-hidden="true">
+                <h3>Tab 2 Content</h3>
+                <p>This is the content for the second tab.</p>
+            </div>
+            <div role="tabpanel" class="tab-panel" id="tab3" aria-labelledby="tab3-btn" aria-hidden="true">
+                <h3>Tab 3 Content</h3>
+                <p>This is the content for the third tab.</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal" class="modal" role="dialog" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal-content">
+            <h2 id="modal-title">Test Modal</h2>
+            <p>This is a test modal for accessibility testing.</p>
+            <button onclick="closeModal()">Close Modal</button>
+        </div>
+    </div>
+
+    <footer role="contentinfo">
+        <p>&copy; 2024 Accessibility Test Page</p>
+    </footer>
+
+    <script>
+        function openModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'block';
+            modal.setAttribute('aria-hidden', 'false');
+            document.querySelector('#modal button').focus();
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function toggleContent() {
+            const content = document.getElementById('toggleable-content');
+            const isVisible = content.style.display !== 'none';
+            content.style.display = isVisible ? 'none' : 'block';
+        }
+
+        // Tab functionality
+        document.querySelectorAll('[role="tab"]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update tab states
+                document.querySelectorAll('[role="tab"]').forEach(t => {
+                    t.setAttribute('aria-selected', 'false');
+                    t.classList.remove('active');
+                });
+                tab.setAttribute('aria-selected', 'true');
+                tab.classList.add('active');
+
+                // Update panels
+                document.querySelectorAll('[role="tabpanel"]').forEach(panel => {
+                    panel.setAttribute('aria-hidden', 'true');
+                });
+                const targetPanel = document.getElementById(tab.getAttribute('aria-controls'));
+                targetPanel.setAttribute('aria-hidden', 'false');
+            });
+
+            // Arrow key navigation
+            tab.addEventListener('keydown', (e) => {
+                const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+                const currentIndex = tabs.indexOf(tab);
+                
+                if (e.key === 'ArrowRight' && currentIndex < tabs.length - 1) {
+                    tabs[currentIndex + 1].focus();
+                } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                    tabs[currentIndex - 1].focus();
+                } else if (e.key === 'Home') {
+                    tabs[0].focus();
+                } else if (e.key === 'End') {
+                    tabs[tabs.length - 1].focus();
+                }
+            });
+        });
+
+        // Escape key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,178 @@
+{
+  "timestamp": "2025-06-04T09:05:46.026Z",
+  "summary": {
+    "totalPages": 5,
+    "totalViolations": 4,
+    "totalPasses": 97,
+    "violationsByLevel": {
+      "minor": 0,
+      "moderate": 0,
+      "serious": 4,
+      "critical": 0
+    },
+    "overallScore": 96
+  },
+  "pageResults": [
+    {
+      "name": "Home Page",
+      "url": "http://localhost:8082/",
+      "accessibility": {
+        "violations": 0,
+        "passes": 21,
+        "violationDetails": []
+      },
+      "keyboard": {
+        "focusableElements": 24,
+        "keyboardTrapDetected": false
+      },
+      "semantic": {
+        "headings": 14,
+        "h1Count": 1,
+        "mainLandmarks": 0,
+        "navLandmarks": 0,
+        "forms": 0,
+        "imagesWithoutAlt": 0
+      },
+      "score": 100
+    },
+    {
+      "name": "Dashboard",
+      "url": "http://localhost:8082/dashboard",
+      "accessibility": {
+        "violations": 1,
+        "passes": 19,
+        "violationDetails": [
+          {
+            "id": "color-contrast",
+            "impact": "serious",
+            "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=playwright",
+            "nodes": 1
+          }
+        ]
+      },
+      "keyboard": {
+        "focusableElements": 1,
+        "keyboardTrapDetected": false
+      },
+      "semantic": {
+        "headings": 1,
+        "h1Count": 1,
+        "mainLandmarks": 0,
+        "navLandmarks": 0,
+        "forms": 0,
+        "imagesWithoutAlt": 0
+      },
+      "score": 95
+    },
+    {
+      "name": "Upload",
+      "url": "http://localhost:8082/upload",
+      "accessibility": {
+        "violations": 1,
+        "passes": 19,
+        "violationDetails": [
+          {
+            "id": "color-contrast",
+            "impact": "serious",
+            "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=playwright",
+            "nodes": 1
+          }
+        ]
+      },
+      "keyboard": {
+        "focusableElements": 1,
+        "keyboardTrapDetected": false
+      },
+      "semantic": {
+        "headings": 1,
+        "h1Count": 1,
+        "mainLandmarks": 0,
+        "navLandmarks": 0,
+        "forms": 0,
+        "imagesWithoutAlt": 0
+      },
+      "score": 95
+    },
+    {
+      "name": "Admin",
+      "url": "http://localhost:8082/admin",
+      "accessibility": {
+        "violations": 1,
+        "passes": 19,
+        "violationDetails": [
+          {
+            "id": "color-contrast",
+            "impact": "serious",
+            "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=playwright",
+            "nodes": 1
+          }
+        ]
+      },
+      "keyboard": {
+        "focusableElements": 1,
+        "keyboardTrapDetected": false
+      },
+      "semantic": {
+        "headings": 1,
+        "h1Count": 1,
+        "mainLandmarks": 0,
+        "navLandmarks": 0,
+        "forms": 0,
+        "imagesWithoutAlt": 0
+      },
+      "score": 95
+    },
+    {
+      "name": "Billing",
+      "url": "http://localhost:8082/billing",
+      "accessibility": {
+        "violations": 1,
+        "passes": 19,
+        "violationDetails": [
+          {
+            "id": "color-contrast",
+            "impact": "serious",
+            "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=playwright",
+            "nodes": 1
+          }
+        ]
+      },
+      "keyboard": {
+        "focusableElements": 1,
+        "keyboardTrapDetected": false
+      },
+      "semantic": {
+        "headings": 1,
+        "h1Count": 1,
+        "mainLandmarks": 0,
+        "navLandmarks": 0,
+        "forms": 0,
+        "imagesWithoutAlt": 0
+      },
+      "score": 95
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "issue": "color-contrast",
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "affectedPages": 4,
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast?application=playwright"
+    }
+  ],
+  "wcagCompliance": {
+    "levelA": {
+      "passed": 0,
+      "failed": 0
+    },
+    "levelAA": {
+      "passed": 97,
+      "failed": 4
+    }
+  }
+}

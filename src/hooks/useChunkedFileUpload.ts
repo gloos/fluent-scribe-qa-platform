@@ -175,8 +175,8 @@ export const useChunkedFileUpload = (options: UseChunkedFileUploadOptions = {}) 
         throw new Error(reassemblyResult.error || 'Reassembly failed')
       }
 
-      // Get public URL for the reassembled file
-      const publicUrl = `${process.env.REACT_APP_SUPABASE_URL}/storage/v1/object/public/${options.bucket || 'qa-files'}/${reassemblyResult.filePath}`
+      // Return public URL for immediate access
+      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${options.bucket || 'qa-files'}/${reassemblyResult.filePath}`
 
       const finalResult = {
         path: reassemblyResult.filePath,

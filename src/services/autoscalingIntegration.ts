@@ -41,10 +41,10 @@ export class AutoscalingIntegration extends EventEmitter {
     this.loadBalancingService = new LoadBalancingService(this.clusterManager);
     
     // Initialize database monitoring if available
-    if (process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY) {
+    if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
       this.databaseMonitor = new DatabaseMonitoringService(
-        process.env.VITE_SUPABASE_URL,
-        process.env.VITE_SUPABASE_ANON_KEY
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY
       );
     } else {
       this.log('warn', 'Database monitoring not available - missing Supabase credentials');

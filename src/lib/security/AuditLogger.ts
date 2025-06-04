@@ -105,16 +105,14 @@ export class AuditLogger {
   constructor() {
     // Initialize Supabase client for database operations
     // Try multiple environment variable patterns and fallback to known working values
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 
-                       process.env.VITE_SUPABASE_URL || 
-                       process.env.SUPABASE_URL || 
-                       'https://uqprvrrncpqhpfxafeuc.supabase.co';
-    
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
-                       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-                       process.env.VITE_SUPABASE_ANON_KEY ||
-                       process.env.SUPABASE_ANON_KEY ||
-                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcHJ2cnJuY3BxaHBmeGFmZXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzODExNjcsImV4cCI6MjA2Mzk1NzE2N30.k589z5xDaS10D4CZaNq16Egixr8CBk5C0InRt1BTdTE';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ||
+      (typeof process !== 'undefined' && process.env ? process.env.VITE_SUPABASE_URL : '') ||
+      '';
+
+    const supabaseKey = (typeof process !== 'undefined' && process.env ? process.env.SUPABASE_SERVICE_ROLE_KEY : '') ||
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      (typeof process !== 'undefined' && process.env ? process.env.VITE_SUPABASE_ANON_KEY : '') ||
+      '';
     
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }

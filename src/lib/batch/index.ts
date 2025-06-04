@@ -181,6 +181,6 @@ export class BatchResultsManager {
 export const batchResultsManager = new BatchResultsManager()
 
 // Auto-initialize on import (can be disabled by setting env var)
-if (typeof window !== 'undefined' && !process.env.DISABLE_AUTO_INIT) {
+if (typeof window !== 'undefined' && !import.meta.env.VITE_DISABLE_AUTO_INIT) {
   batchResultsManager.initialize().catch(console.error)
 } 
